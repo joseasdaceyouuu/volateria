@@ -1,0 +1,28 @@
+{
+  "name": "volateria",
+  "version": "1.0.0",
+  "private": true,
+  "description": "El tiro al pato de feria, reimaginado — oleadas evasivas, señuelos, globos de poder y EL PATO REAL. Canvas 2D + WebGL + WebAudio, cero assets.",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build && node scripts/postbuild.mjs",
+    "start": "node .next/standalone/server.js",
+    "lint": "eslint .",
+    "probe": "node scripts/probe.mjs"
+  },
+  "dependencies": {
+    "next": "^16.1.1",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^26.5.1",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^16.1.1",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

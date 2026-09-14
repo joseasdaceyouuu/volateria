@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* VOLATERÍA standalone — mismos design tokens del lab (editorial dark):
+   la feria proyectada en una sala oscura. Solo viaja lo que el juego
+   y su marco consumen: la paleta, las tres tipografías y las dos
+   micro-animaciones del boot. */
+
+@theme inline {
+  --color-ink: #0d0c0a;
+  --color-ink-soft: #14130f;
+  --color-ink-card: #171610;
+  --color-cream: #ede8df;
+  --color-smoke: #96907f;
+  --color-faint: #8a8474;
+  --color-copper: #c9a06b;
+  --color-copper-soft: #d9bc8f;
+  --color-line: rgba(237, 232, 223, 0.09);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-grotesk);
+  --font-serif: var(--font-serif-display);
+  --font-mono: var(--font-mono-juke);
+}
+
+:root {
+  --background: #0d0c0a;
+  --foreground: #ede8df;
+}
+
+@layer base {
+  html {
+    position: relative;
+    font-family: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
+  }
+  body {
+    @apply bg-ink text-cream antialiased;
+    font-family: var(--font-grotesk), ui-sans-serif, system-ui, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    overflow-x: clip;
+  }
+  ::selection {
+    background: #c9a06b;
+    color: #0d0c0a;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0d0c0a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2b2820;
+    border-radius: 8px;
+    border: 2px solid #0d0c0a;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #c9a06b;
+  }
+}
+
+/* ── Boot — el pulso de cobre mientras abre la feria ───────── */
+@keyframes pulse-copper {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(201, 160, 107, 0.5); }
+  55% { box-shadow: 0 0 0 6px rgba(201, 160, 107, 0); }
+}
+.pulse-copper {
+  animation: pulse-copper 2.4s ease-out infinite;
+}
+
+/* cursor de máquina — el caret del boot */
+.tw-caret {
+  display: inline-block;
+  width: 1px;
+  height: 0.85em;
+  margin-left: 2px;
+  vertical-align: -0.08em;
+  background: #c9a06b;
+  animation: caret-blink 1s steps(1) infinite;
+}
+@keyframes caret-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-copper,
+  .tw-caret {
+    animation: none;
+  }
+}
