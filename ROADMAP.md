@@ -39,7 +39,8 @@ Lo que se está templando en el taller, entre algodón de azúcar y soldadura:
 Apuntadas con tiza en la pared del taller; requieren capataz y calma:
 
 - **i18n EN/ES** — traducir el marco manteniendo el argot de feria en español: las bandadas hablan en castellano.
-- **OffscreenCanvas + Web Worker** — mandar la capa 2D a un worker: el hilo principal respira y el 120 Hz es posible.
+- **gamepad API (ESTRENADO v1.2.0: stick, gatillo y Start)
+- OffscreenCanvas + Web Worker** — mandar la capa 2D a un worker: el hilo principal respira y el 120 Hz es posible.
 - **Gamepad API** — jugar con mando: gatillo analógico, mira con stick, vibración nativa.
 - **Ports a portales de web games** — llevar la caseta a itch.io, Poki y CrazyGames: más feria, más público.
 - **Analytics privacy-first** — telemetría propia sin cookies ni rastreadores: saber cuánta gente juega sin espiarla.

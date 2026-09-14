@@ -1739,6 +1739,33 @@ function VolateriaEngine({
     /* V69: la PAUSA de la sala — el mundo contiene el aliento, el
        audio se duerme, y ni spawnT ni fugas avanzan mientras tanto.
        La sala manda (ESC/P/botón); el motor obedece. */
+    /* V74: EL MANDO DE LA FERIA — stick mueve la mira, A o gatillo
+       derecho dispara, Start pausa. Poll barato en cada frame. */
+    let padFire = false;
+    let padStart = false;
+    const pollPad = () => {
+      try {
+        const pads = navigator.getGamepads?.() ?? [];
+        const gp = Array.from(pads).find((g) => g && g.connected);
+        if (!gp) return;
+        const ax = gp.axes[0] ?? 0;
+        const ay = gp.axes[1] ?? 0;
+        if (Math.abs(ax) > 0.18 || Math.abs(ay) > 0.18) {
+          puntero.x = Math.max(0, Math.min(w, puntero.x + ax * 14));
+          puntero.y = Math.max(0, Math.min(h, puntero.y + ay * 14));
+          puntero.inside = true;
+        }
+        const fire =
+          (gp.buttons[0]?.pressed ?? false) ||
+          (gp.buttons[7]?.value ?? 0) > 0.4;
+        if (fire && !padFire) disparo(puntero.x, puntero.y);
+        padFire = fire;
+        const st = gp.buttons[9]?.pressed ?? false;
+        if (st && !padStart) togglePausa();
+        padStart = st;
+      } catch {}
+    };
+
     const togglePausa = () => {
       if (fase !== "jugando") return;
       pausado = !pausado;
@@ -3265,6 +3292,7 @@ function VolateriaEngine({
       tGlobal += dt / 60;
 
       if (fase === "jugando" && !pausado) {
+        pollPad();
         if (freezeT > 0) {
           freezeT -= dt; /* hitstop — el mundo contiene el aliento */
         } else {
