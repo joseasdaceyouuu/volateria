@@ -81,3 +81,24 @@ export const tipoDeJefe = (r: number): "real" | "banda" =>
 
 /* V71: las letras del PREMIO — el mensajero verde las trae una a una */
 export const LETRAS_PREMIO = "PREMIO";
+
+/* ── V72: LA RUN RECUPERABLE — la tarde no se pierde con un refresh ── */
+export const RUN_KEY = "vp-run";
+export type RunSnapshot = {
+  v: 1;
+  ronda: number; // la ronda QUE VIENE (ya superada la anterior)
+  puntos: number;
+  racha: number;
+  hits: number;
+  escapes: number;
+  tiros: number;
+  letras: string; // "" · "PRE…" · "PREMIO"
+  modo: ModoId;
+  diaria: boolean;
+};
+
+/* llaves del localStorage de la meta (V72) */
+export const ARCHIVO_KEY = "vp-archivo";
+export const TROFEOS_KEY = "vp-trofeos";
+export const dailyKey = (d = new Date()) =>
+  `vp-daily-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;

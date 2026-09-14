@@ -35,6 +35,21 @@ import VolateriaEngine, {
   type VolateriaApi,
   type VolateriaStats,
 } from "./engine/volateria-engine";
+import {
+  TROFEOS,
+  comparteRun,
+  fusionaArchivo,
+  guardaArchivo,
+  guardaTrofeos,
+  leeArchivo,
+  leeRun,
+  leeSelloDiario,
+  leeTrofeos,
+  sellaDiario,
+  trofeosGanados,
+  type Archivo,
+  type Trofeo,
+} from "./meta";
 
 const FASE_INICIAL: VolateriaStats = {
   ok: false,
@@ -70,6 +85,12 @@ const FASE_INICIAL: VolateriaStats = {
   modo: "feria",
   viento: 0,
   letras: "",
+  diaria: false,
+  grazes: 0,
+  jefes: 0,
+  perfectas: 0,
+  premios: 0,
+  porEspecie: {},
   patos: [],
 };
 
@@ -104,6 +125,54 @@ export default function Volateria() {
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 90);
     return () => clearTimeout(t);
+  }, []);
+
+  /* V72: la meta — run guardada, sello del día, archivo y trofeos */
+  const [runGuardada] = useState(() => leeRun());
+  const [sello] = useState(() => leeSelloDiario());
+  const [archivoAbierto, setArchivoAbierto] = useState(false);
+  const [archivo, setArchivo] = useState<Archivo>(() => leeArchivo());
+  const [trofeos, setTrofeos] = useState<Record<string, boolean>>(() =>
+    leeTrofeos(),
+  );
+  const [toast, setToast] = useState<{ txt: string; sub: string } | null>(null);
+  const [shareTxt, setShareTxt] = useState("");
+
+  /* trofeos — se vigilan en cada telemetría; el ref evita releer */
+  const trofeosRef = useRef(trofeos);
+  useEffect(() => {
+    const gana = trofeosGanados(stats, trofeosRef.current);
+    if (gana.length === 0) return;
+    const nuevo = { ...trofeosRef.current };
+    for (const t of gana) nuevo[t.id] = true;
+    trofeosRef.current = nuevo;
+    guardaTrofeos(nuevo);
+    setTrofeos(nuevo);
+    setToast({ txt: `TROFEO — ${gana[0].nombre}`, sub: gana[0].desc });
+  }, [stats]);
+
+  /* el archivo del cazador — se funde una vez por partida al caer */
+  const mergeRef = useRef("");
+  useEffect(() => {
+    if (stats.fase !== "fin") return;
+    const sig = `${stats.puntos}-${stats.tiros}-${stats.ronda}-${stats.diaria}`;
+    if (mergeRef.current === sig) return;
+    mergeRef.current = sig;
+    const fus = fusionaArchivo(leeArchivo(), stats);
+    guardaArchivo(fus);
+    setArchivo(fus);
+    if (stats.diaria) sellaDiario(stats);
+  }, [stats.fase, stats]);
+
+  /* el toast se despide solo */
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2600);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const onCompartir = useCallback(async (s: VolateriaStats) => {
+    setShareTxt(await comparteRun(s));
   }, []);
 
   /* telemetría para probes — objeto plano, los mismos campos SIEMPRE */
@@ -144,6 +213,12 @@ export default function Volateria() {
       modo: stats.modo,
       viento: stats.viento,
       letras: stats.letras,
+      diaria: stats.diaria,
+      grazes: stats.grazes,
+      jefes: stats.jefes,
+      perfectas: stats.perfectas,
+      premios: stats.premios,
+      porEspecie: stats.porEspecie,
       patos: stats.patos,
     };
   }, [stats]);
@@ -441,6 +516,21 @@ export default function Volateria() {
                     </button>
                   ))}
                 </div>
+                {/* V72: la tarde guardada — CONTINUAR donde quedó */}
+                {runGuardada && runGuardada.ronda > 1 && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      apiRef.current?.empezar(runGuardada.modo, {
+                        continuar: runGuardada,
+                      })
+                    }
+                    className="inline-flex items-center gap-3 rounded-full border border-[#7fd4c2]/60 bg-[#7fd4c2]/10 px-6 py-2.5 font-mono text-[10px] uppercase tracking-[0.25em] text-[#7fd4c2] transition-colors duration-300 hover:bg-[#7fd4c2]/20"
+                  >
+                    Continuar — ronda {runGuardada.ronda} ·{" "}
+                    {runGuardada.puntos} pts
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => apiRef.current?.empezar(modoSel)}
@@ -454,10 +544,55 @@ export default function Volateria() {
                     →
                   </span>
                 </button>
+                {/* V72: la volada del día + el archivo — la feria con memoria */}
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      apiRef.current?.empezar(modoSel, { diaria: true })
+                    }
+                    className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-5 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                  >
+                    <span aria-hidden>☀</span>
+                    Volada del día
+                    {sello && (
+                      <span className="text-copper">
+                        · {sello.puntos} pts
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setArchivoAbierto(true)}
+                    className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-5 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                  >
+                    <span aria-hidden>▦</span>
+                    El archivo
+                  </button>
+                </div>
                 <SoundBtn
                   on={!stats.muted}
                   onToggle={() => apiRef.current?.snd()}
                 />
+              </div>
+              {/* V72: la medallera — los trofeos de la casa */}
+              <div
+                className={`mt-5 flex items-center justify-center gap-2 ${entra("[transition-delay:600ms]")}`}
+                aria-label="Trofeos ganados"
+              >
+                {TROFEOS.map((t) => (
+                  <span
+                    key={t.id}
+                    title={`${t.nombre} — ${t.desc}`}
+                    className={`flex h-6 w-6 items-center justify-center rounded-full border text-[10px] ${
+                      trofeos[t.id]
+                        ? "border-copper/80 bg-copper/20 text-copper"
+                        : "border-line/60 text-faint/40"
+                    }`}
+                  >
+                    ✦
+                  </span>
+                ))}
               </div>
               <p
                 className={`mt-6 font-mono text-[9px] uppercase tracking-[0.25em] text-faint/70 ${entra("[transition-delay:640ms]")}`}
@@ -540,7 +675,7 @@ export default function Volateria() {
               <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
                 <button
                   type="button"
-                  onClick={() => apiRef.current?.empezar()}
+                  onClick={() => apiRef.current?.empezar(modoSel)}
                   className="group inline-flex items-center gap-3 rounded-full border border-copper/70 bg-copper/10 px-8 py-3.5 font-mono text-[11px] uppercase tracking-[0.3em] text-copper transition-colors duration-300 hover:bg-copper/20"
                 >
                   Reintentar
@@ -550,6 +685,15 @@ export default function Volateria() {
                   >
                     →
                   </span>
+                </button>
+                {/* V72: el texto de la tarde — spoiler-free, al hombro */}
+                <button
+                  type="button"
+                  onClick={() => onCompartir(stats)}
+                  className="inline-flex items-center gap-3 rounded-full border border-line bg-ink/60 px-6 py-3 font-mono text-[10px] uppercase tracking-[0.25em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                >
+                  <span aria-hidden>✉</span>
+                  {shareTxt === "" ? "Compartir" : shareTxt}
                 </button>
                 <SoundBtn
                   on={!stats.muted}
@@ -590,6 +734,131 @@ export default function Volateria() {
               on={!stats.muted}
               onToggle={() => apiRef.current?.snd()}
             />
+          </div>
+        )}
+
+        {/* V72: el toast de los trofeos — la feria aplaude bajito */}
+        {toast && (
+          <div
+            data-volateria-ui
+            aria-live="polite"
+            className="pointer-events-none absolute left-1/2 top-4 z-[97] w-max -translate-x-1/2 rounded-lg border border-copper/60 bg-[#0a0908]/90 px-5 py-2.5 text-center backdrop-blur-sm"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-copper">
+              {toast.txt}
+            </p>
+            <p className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.18em] text-faint">
+              {toast.sub}
+            </p>
+          </div>
+        )}
+
+        {/* V72: EL ARCHIVO DEL CAZADOR — la memoria de la feria */}
+        {archivoAbierto && (
+          <div
+            data-volateria-ui
+            className="absolute inset-0 z-[96] grid place-items-center bg-[#0a0908]/70 backdrop-blur-[3px]"
+          >
+            <div className="max-h-[86vh] max-w-2xl overflow-y-auto px-6 mx-6">
+              <div className="border border-line/80 bg-ink/85 p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-copper">
+                    El archivo del cazador
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setArchivoAbierto(false)}
+                    aria-label="Cerrar el archivo"
+                    className="rounded-full border border-line px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                  >
+                    cerrar
+                  </button>
+                </div>
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    ["partidas", String(archivo.partidas)],
+                    [
+                      "puntería",
+                      archivo.tiros > 0
+                        ? `${Math.round((archivo.hits / archivo.tiros) * 100)}%`
+                        : "—",
+                    ],
+                    ["al pelo", String(archivo.grazes)],
+                    ["coronas", String(archivo.jefes)],
+                    ["mejor ronda", String(archivo.mejorRonda)],
+                    ["mejor racha", `×${1 + Math.min(3, Math.floor(archivo.mejorRacha / 3))}`],
+                    ["máx puntos", String(archivo.maxPuntos)],
+                    ["plomo gastado", String(archivo.tiros)],
+                  ].map(([k, v]) => (
+                    <div key={k} className="border border-line/60 bg-[#0d0c0a] px-3 py-2.5">
+                      <p className="font-mono text-[8px] uppercase tracking-[0.22em] text-faint">
+                        {k}
+                      </p>
+                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-cream">
+                        {v}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
+                  El bestiario — lo cazado en toda la historia
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(
+                    [
+                      "bronce",
+                      "zafiro",
+                      "dorada",
+                      "humo",
+                      "acorazado",
+                      "real",
+                      "espejo",
+                      "banda",
+                      "mensajero",
+                      "senuelo",
+                      "cuervo",
+                    ] as const
+                  ).map((t) => (
+                    <span
+                      key={t}
+                      className={`rounded-sm border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] ${
+                        (archivo.especie[t] ?? 0) > 0
+                          ? "border-copper/60 text-copper"
+                          : "border-line/60 text-faint/50"
+                      }`}
+                    >
+                      {t} {(archivo.especie[t] ?? 0) > 0 ? `×${archivo.especie[t]}` : "·"}
+                    </span>
+                  ))}
+                </div>
+                <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
+                  Los trofeos de la feria
+                </p>
+                <div className="mt-2 grid max-h-40 gap-1.5 overflow-y-auto pr-1">
+                  {TROFEOS.map((t: Trofeo) => (
+                    <div
+                      key={t.id}
+                      className={`flex items-center justify-between gap-3 border px-3 py-1.5 ${
+                        trofeos[t.id]
+                          ? "border-copper/50 bg-copper/5"
+                          : "border-line/50"
+                      }`}
+                    >
+                      <span
+                        className={`font-mono text-[10px] uppercase tracking-[0.2em] ${
+                          trofeos[t.id] ? "text-copper" : "text-faint/60"
+                        }`}
+                      >
+                        {trofeos[t.id] ? "✦" : "◇"} {t.nombre}
+                      </span>
+                      <span className="font-mono text-[9px] text-faint/70">
+                        {t.desc}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

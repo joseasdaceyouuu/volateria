@@ -138,8 +138,13 @@ import {
   cuotaModo,
   tipoDeJefe,
 } from "./config";
-import { type Modo, type ModoId } from "./config";
-import { type Rng } from "./rng";
+import {
+  RUN_KEY,
+  type Modo,
+  type ModoId,
+  type RunSnapshot,
+} from "./config";
+import { mulberry32, semillaDelDia, type Rng } from "./rng";
 import {
   ESPECIES,
   PATRON_VEL,
@@ -202,6 +207,12 @@ export type VolateriaStats = {
   modo: string; // cabrito · feria · veterano (V71)
   viento: number; // fuerza del vendaval (V71)
   letras: string; // letras del PREMIO recogidas (V71)
+  diaria: boolean; // ¿volada del día? (V72)
+  grazes: number; // silbidos al pelo en la run (V72)
+  jefes: number; // coronas abatidas en la run (V72)
+  perfectas: number; // voladas perfectas en la run (V72)
+  premios: number; // PREMIOS completados en la run (V72)
+  porEspecie: Record<string, number>; // cazados por especie (V72)
   patos: PatoTelemetria[];
 };
 
@@ -210,7 +221,10 @@ export type VolateriaApi = {
   disparo: (cx: number, cy: number) => void;
   recargar: () => void;
   pausa: () => void;
-  empezar: (m?: ModoId) => void;
+  empezar: (
+    m?: ModoId,
+    opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
+  ) => void;
   snd: () => void;
   leave: () => void;
 };
@@ -352,8 +366,8 @@ function VolateriaEngine({
     const audio = new VolateriaAudio();
 
     /* el azar del juego — Math.random en la partida libre; la
-       Volada del Día planta una semilla (V72) y la feria repite */
-    // eslint-disable-next-line prefer-const -- V72 reasigna con la semilla diaria
+       Volada del Día planta la semilla (V72) y la feria repite
+       el mismo vuelo para todo el planeta */
     let rng: Rng = Math.random;
 
     /* ── estado del juego — la única fuente de verdad ── */
@@ -402,6 +416,13 @@ function VolateriaEngine({
     let vientoActivo = false;
     /* V71: la banda silvestre */
     let bandT = 900;
+    /* V72: la meta — contadores de la run para trofeos y archivo */
+    let diaria = false;
+    let grazesRun = 0;
+    let jefesRun = 0;
+    let perfectasRun = 0;
+    let premiosRun = 0;
+    const porEspecie: Record<string, number> = {};
 
     /* poder activo y sus trampas */
     let poder: Poder = "";
@@ -483,6 +504,12 @@ function VolateriaEngine({
         modo: modo.id,
         viento: Math.round(vientoF * 100) / 100,
         letras: letras.join(""),
+        diaria,
+        grazes: grazesRun,
+        jefes: jefesRun,
+        perfectas: perfectasRun,
+        premios: premiosRun,
+        porEspecie: { ...porEspecie },
         enCola: Math.max(0, VOLADA - lanzados),
         resultados: res.slice(),
         zorro: zorro.estado === "oculto" ? 0 : 1,
@@ -1121,6 +1148,7 @@ function VolateriaEngine({
         const ptsB = E.ptos * multB;
         puntos += ptsB;
         hits++;
+        porEspecie.banda = (porEspecie.banda ?? 0) + 1;
         popups.push({
           x: p.x,
           y: p.y - 20,
@@ -1260,6 +1288,7 @@ function VolateriaEngine({
       p.estado = "caida";
       p.flashT = 3;
       p.vy = -1.3;
+      porEspecie[p.tipo] = (porEspecie[p.tipo] ?? 0) + 1;
       freezeT = reduced ? 0 : 3; // hitstop — el mundo contiene el aliento
       racha++;
       const mult = multOf(racha);
@@ -1319,6 +1348,7 @@ function VolateriaEngine({
           spawnGlobo();
           spawnGlobo();
           letras = []; // la colección vuelve a empezar
+          premiosRun++;
           audio.corona();
         }
       }
@@ -1381,10 +1411,12 @@ function VolateriaEngine({
           audio.corona();
         } else {
           audio.tinc();
+          jefesRun++;
         }
         return;
       }
       if (p.tipo === "real") {
+        jefesRun++;
         for (let i = 0; i < VOLADA; i++) res[i] = "acierto";
         volleyHits = cuotaModo(ronda, modo);
         const botin = 300 * ronda;
@@ -1651,6 +1683,7 @@ function VolateriaEngine({
         }
         if (cerca) {
           puntos += 25;
+          grazesRun++;
           popups.push({
             x: cerca.x,
             y: cerca.y - 34,
@@ -1709,6 +1742,25 @@ function VolateriaEngine({
       }
     };
 
+    /* V72: el autoguardado de la feria — snapshot al pasar ronda */
+    const salvaRun = () => {
+      try {
+        const s: RunSnapshot = {
+          v: 1,
+          ronda,
+          puntos,
+          racha,
+          hits,
+          escapes,
+          tiros,
+          letras: letras.join(""),
+          modo: modo.id,
+          diaria,
+        };
+        localStorage.setItem(RUN_KEY, JSON.stringify(s));
+      } catch {}
+    };
+
     const finDelJuego = () => {
       fase = "fin";
       recordNuevo = puntos > record;
@@ -1716,6 +1768,9 @@ function VolateriaEngine({
         record = puntos;
         guardarRecord(modo.recordKey, puntos);
       }
+      try {
+        localStorage.removeItem(RUN_KEY);
+      } catch {}
       audio.fin();
       emit();
     };
@@ -1731,6 +1786,7 @@ function VolateriaEngine({
         const premio = perfecta ? 200 * ronda : 0;
         if (premio > 0) {
           puntos += premio;
+          perfectasRun++;
           audio.perfecta();
           if (!reduced) shakeA = Math.max(shakeA, 5);
         }
@@ -1776,6 +1832,8 @@ function VolateriaEngine({
         if (esJefe(ronda)) audio.jefe();
         audio.ronda();
         spawnT = 56;
+        /* V72: la tarde se guarda — un refresh ya no la mata */
+        salvaRun();
       } else {
         convocaZorro(w * 0.5, false, true);
         finDelJuego();
@@ -1802,8 +1860,15 @@ function VolateriaEngine({
       emit();
     };
 
-    const empezar = (m?: ModoId) => {
+    const empezar = (
+      m?: ModoId,
+      opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
+    ) => {
       audio.gesto();
+      /* V72: la Volada del Día planta la semilla — misma feria para
+         todo el planeta; la partida libre vuelve al caos legítimo */
+      diaria = !!opts?.diaria;
+      rng = diaria ? mulberry32(semillaDelDia()) : Math.random;
       if (m && MODOS[m]) modo = MODOS[m];
       letras = [];
       cadena = 0;
@@ -1813,17 +1878,36 @@ function VolateriaEngine({
       vientoActivo = false;
       vientoDuro = 0;
       vientoT = 460 + rng() * 300;
-      ronda = 1;
-      puntos = 0;
+      grazesRun = 0;
+      jefesRun = 0;
+      perfectasRun = 0;
+      premiosRun = 0;
+      for (const k of Object.keys(porEspecie)) delete porEspecie[k];
+      const c = opts?.continuar ?? null;
+      if (c && c.v === 1 && MODOS[c.modo]) {
+        modo = MODOS[c.modo];
+        diaria = !!c.diaria;
+        ronda = Math.max(1, Math.floor(c.ronda));
+        puntos = Math.max(0, Math.floor(c.puntos));
+        racha = Math.max(0, Math.floor(c.racha));
+        hits = Math.max(0, Math.floor(c.hits));
+        escapes = Math.max(0, Math.floor(c.escapes));
+        tiros = Math.max(0, Math.floor(c.tiros));
+        letras = c.letras.split("");
+        plan = construirPlan(ronda);
+      } else {
+        ronda = 1;
+        puntos = 0;
+        racha = 0;
+        hits = 0;
+        escapes = 0;
+        tiros = 0;
+        plan = construirPlan(1);
+      }
       recordNuevo = false;
-      racha = 0;
-      hits = 0;
-      escapes = 0;
-      tiros = 0;
       volleyHits = 0;
       lanzados = 0;
       pendiente = 0;
-      plan = construirPlan(1);
       cargador = modo.balasBase;
       balas = modo.balasBase;
       recT = 0;
@@ -1841,7 +1925,16 @@ function VolateriaEngine({
       chispas.length = 0;
       anillos.length = 0;
       popups.length = 0;
-      banner = null;
+      banner = {
+        txt: `RONDA ${ronda}`,
+        sub: c
+          ? "la tarde continúa donde quedó"
+          : diaria
+            ? "la volada del día · todos al mismo cielo"
+            : `${modo.lema} · ${modo.nombre}`,
+        t: 0,
+        vida: 130,
+      };
       zorro.estado = "oculto";
       zorro.t = 0;
       freezeT = 0;
@@ -3179,7 +3272,10 @@ function VolateriaEngine({
         disparo,
         recargar,
         pausa: togglePausa,
-        empezar: (m?: ModoId) => empezar(m),
+        empezar: (
+          m?: ModoId,
+          opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
+        ) => empezar(m, opts),
         snd: () => {
           audio.snd();
           emit();

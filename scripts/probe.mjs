@@ -16,6 +16,7 @@
    8. M silencio → muted on/off.
    8b. CONTRATO AMPLIADO: poder/poderT/globos[]/cebo/id/cuota.
    8d. V71: modo/viento/letras en telemetría + selector VETERANO (2 balas).
+   8e. V72: campos de meta (diaria/grazes/jefes/perfectas/premios/porEspecie).
    8c. GLOBO DE PODER: aparece, se le dispara → poder activo o PLOMO.
    9. MÓVIL 390: la feria vive (fps>=3) y el tap dispara (balas--).
   10. ESC sin salida (el juego ES la raíz). Cero errores de consola.
@@ -367,6 +368,24 @@ check(
 );
 await pg2.screenshot({ path: `${OUT}06-veterano.png` });
 await pg2.close();
+
+/* ── 8e · V72 — META: diaria, trofeos y archivo en telemetría ── */
+const v72 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return {
+    diaria: typeof d.diaria,
+    grazes: typeof d.grazes,
+    jefes: typeof d.jefes,
+    perfectas: typeof d.perfectas,
+    premios: typeof d.premios,
+    porEspecie: typeof d.porEspecie,
+  };
+});
+check(
+  "v72 — telemetría de la meta (diaria, grazes, jefes, perfectas, premios, porEspecie)",
+  Object.values(v72).every((t) => t === "boolean" || t === "number" || t === "object"),
+  JSON.stringify(v72),
+);
 
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
