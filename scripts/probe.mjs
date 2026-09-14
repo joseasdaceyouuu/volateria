@@ -15,6 +15,7 @@
    7. RECARGA: balas a cero → tecla R → cargador de nuevo (recargando).
    8. M silencio → muted on/off.
    8b. CONTRATO AMPLIADO: poder/poderT/globos[]/cebo/id/cuota.
+   8d. V71: modo/viento/letras en telemetría + selector VETERANO (2 balas).
    8c. GLOBO DE PODER: aparece, se le dispara → poder activo o PLOMO.
    9. MÓVIL 390: la feria vive (fps>=3) y el tap dispara (balas--).
   10. ESC sin salida (el juego ES la raíz). Cero errores de consola.
@@ -336,6 +337,36 @@ check(
   globoDetalle,
 );
 await page.screenshot({ path: `${OUT}05-globo.png` });
+
+/* ── 8d · V71 — MODO, VIENTO Y LETRAS · el selector manda ────── */
+const v71 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { modo: d.modo, viento: typeof d.viento, letras: typeof d.letras };
+});
+check(
+  "v71 — telemetría nueva (modo, viento, letras)",
+  v71.modo === "feria" && v71.viento === "number" && v71.letras === "string",
+  JSON.stringify(v71),
+);
+const pg2 = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+pg2.on("pageerror", (e) => errors.push(`pg2 pageerror: ${e.message}`));
+await pg2.goto(`${BASE}/`, { waitUntil: "domcontentloaded" });
+await sleep(3000);
+await pg2.getByRole("radio", { name: /VETERANO/ }).click();
+await sleep(300);
+await pg2.getByRole("button", { name: "Comenzar" }).click();
+await sleep(700);
+const vet = await pg2.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { modo: d.modo, balas: d.balas, fase: d.fase };
+});
+check(
+  "v71 — VETERANO arranca con su modo y 2 balas",
+  vet.fase === "jugando" && vet.modo === "veterano" && vet.balas === 2,
+  JSON.stringify(vet),
+);
+await pg2.screenshot({ path: `${OUT}06-veterano.png` });
+await pg2.close();
 
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });

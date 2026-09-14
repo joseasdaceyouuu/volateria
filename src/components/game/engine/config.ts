@@ -27,3 +27,57 @@ export const esJefe = (r: number) => r >= 4 && r % 4 === 0;
 /* duración de los poderes activos, en frames (60fps ≙ dt 1) —
    PLOMO no figura: su efecto es instantáneo, no tiene reloj */
 export const PODER_DURACION = { escopeta: 380, tiempo: 330 } as const;
+
+/* ── V71: LOS MODOS DE LA FERIA — cada uno con su récord propio ── */
+export type ModoId = "cabrito" | "feria" | "veterano";
+export type Modo = {
+  id: ModoId;
+  nombre: string;
+  lema: string;
+  balasBase: number; // cartuchos por pato en la oleada
+  cuotaAjuste: number; // −1 feria amable · +1 sin piedad
+  velocidadMul: number;
+  recordKey: string;
+};
+export const MODOS: Record<ModoId, Modo> = {
+  cabrito: {
+    id: "cabrito",
+    nombre: "CABRITO",
+    lema: "la feria amable",
+    balasBase: 5,
+    cuotaAjuste: -1,
+    velocidadMul: 0.85,
+    recordKey: "vp-volateria-record-cabrito",
+  },
+  feria: {
+    id: "feria",
+    nombre: "FERIA",
+    lema: "la casa manda",
+    balasBase: 3,
+    cuotaAjuste: 0,
+    velocidadMul: 1,
+    recordKey: "vp-volateria-record",
+  },
+  veterano: {
+    id: "veterano",
+    nombre: "VETERANO",
+    lema: "sin piedad",
+    balasBase: 2,
+    cuotaAjuste: 1,
+    velocidadMul: 1.15,
+    recordKey: "vp-volateria-record-veterano",
+  },
+};
+
+/* la cuota de la ronda según el modo — el suelo es 3 para que el
+   cabrito no se ahogue, el techo 9 porque la perfección ya es 8 */
+export const cuotaModo = (r: number, m: Modo) =>
+  Math.max(3, Math.min(9, quotaOf(r) + m.cuotaAjuste));
+
+/* V71: los jefes rotan — ronda 4 EL PATO REAL, ronda 8 LA BANDADA
+   REAL, y así alternando cada cuatro rondas para siempre */
+export const tipoDeJefe = (r: number): "real" | "banda" =>
+  r % 8 === 0 ? "banda" : "real";
+
+/* V71: las letras del PREMIO — el mensajero verde las trae una a una */
+export const LETRAS_PREMIO = "PREMIO";

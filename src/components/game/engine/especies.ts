@@ -10,7 +10,10 @@ export type TipoPato =
   | "acorazado"
   | "real"
   | "senuelo"
-  | "cuervo";
+  | "cuervo"
+  | "espejo"
+  | "banda"
+  | "mensajero";
 export type EstadoPato = "vuelo" | "caida" | "suelto" | "fuga";
 export type Patron = "onda" | "zigzag" | "pica" | "rasante" | "cruce" | "poste";
 export type Poder = "" | "escopeta" | "tiempo";
@@ -145,6 +148,52 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#b9b3c9",
     hp: 1,
     cebo: true,
+  },
+  /* V71 — el ESPEJO: plateado y vanidoso, a veces el plomo rebota */
+  espejo: {
+    cuerpo0: "#c9cdd6",
+    cuerpo1: "#7d828e",
+    ala: "#eef1f6",
+    alaLejos: "#9aa0ac",
+    pico: "#b8894a",
+    panza: "rgba(255,255,255,0.50)",
+    ptos: 400,
+    vel: 1.25,
+    flap: 0.27,
+    popup: "#dfe4ee",
+    hp: 1,
+    cebo: false,
+  },
+  /* V71 — la BANDA: mini patos que vuelan en formación cerrada;
+     al guía se le cae TODA la bandada encima */
+  banda: {
+    cuerpo0: "#b0642f",
+    cuerpo1: "#5e3315",
+    ala: "#e0a35e",
+    alaLejos: "#8a4f22",
+    pico: "#d99a4e",
+    panza: "rgba(255,240,220,0.30)",
+    ptos: 60,
+    vel: 1.4,
+    flap: 0.34,
+    popup: "#f2c08c",
+    hp: 1,
+    cebo: false,
+  },
+  /* V71 — el MENSAJERO: verde y manso, trae una letra del PREMIO */
+  mensajero: {
+    cuerpo0: "#6f8f4a",
+    cuerpo1: "#3a5222",
+    ala: "#a9c47a",
+    alaLejos: "#557031",
+    pico: "#d99a4e",
+    panza: "rgba(240,250,220,0.30)",
+    ptos: 150,
+    vel: 1.05,
+    flap: 0.22,
+    popup: "#cfe3a0",
+    hp: 1,
+    cebo: false,
   },
 };
 

@@ -25,7 +25,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GameFrame, SoundBtn } from "./game-frame";
-import { PODER_DURACION } from "./engine/config";
+import {
+  LETRAS_PREMIO,
+  MODOS,
+  PODER_DURACION,
+  type ModoId,
+} from "./engine/config";
 import VolateriaEngine, {
   type VolateriaApi,
   type VolateriaStats,
@@ -62,6 +67,9 @@ const FASE_INICIAL: VolateriaStats = {
   muted: false,
   px: 0,
   py: 0,
+  modo: "feria",
+  viento: 0,
+  letras: "",
   patos: [],
 };
 
@@ -74,6 +82,24 @@ export default function Volateria() {
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const [mounted, setMounted] = useState(false);
+  /* V71: el modo se elige en el cartel y viaja al COMENZAR; los
+     récords de la casa se leen una vez para pintar el selector */
+  const [modoSel, setModoSel] = useState<ModoId>("feria");
+  const [records] = useState<Record<ModoId, number>>(() => {
+    const lee = (k: string) => {
+      try {
+        const v = Number(localStorage.getItem(k));
+        return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+      } catch {
+        return 0;
+      }
+    };
+    return {
+      cabrito: lee(MODOS.cabrito.recordKey),
+      feria: lee(MODOS.feria.recordKey),
+      veterano: lee(MODOS.veterano.recordKey),
+    };
+  });
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 90);
@@ -115,6 +141,9 @@ export default function Volateria() {
       muted: stats.muted,
       px: stats.px,
       py: stats.py,
+      modo: stats.modo,
+      viento: stats.viento,
+      letras: stats.letras,
       patos: stats.patos,
     };
   }, [stats]);
@@ -193,6 +222,21 @@ export default function Volateria() {
                             : "border border-line bg-transparent"
                     }`}
                   />
+                ))}
+              </div>
+              {/* V71: las letras del PREMIO — la colección de la feria */}
+              <div className="mt-2.5 flex gap-1" aria-label="Letras del premio">
+                {LETRAS_PREMIO.split("").map((l) => (
+                  <span
+                    key={l}
+                    className={`flex h-4 w-4 items-center justify-center rounded-sm border font-mono text-[8px] transition-colors duration-300 ${
+                      stats.letras.includes(l)
+                        ? "border-[#6f8f4a] bg-[#6f8f4a]/25 text-[#cfe3a0]"
+                        : "border-line/70 text-faint/50"
+                    }`}
+                  >
+                    {l}
+                  </span>
                 ))}
               </div>
             </div>
@@ -360,11 +404,46 @@ export default function Volateria() {
               </div>
 
               <div
-                className={`mt-9 flex flex-wrap items-center justify-center gap-4 ${entra("[transition-delay:540ms]")}`}
+                className={`mt-9 flex flex-col items-center gap-4 ${entra("[transition-delay:540ms]")}`}
               >
+                {/* V71: los tres modos de la feria — cada uno su récord */}
+                <div
+                  role="radiogroup"
+                  aria-label="Modo de juego"
+                  className="flex w-full max-w-md items-stretch justify-center gap-2"
+                >
+                  {Object.values(MODOS).map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={modoSel === m.id}
+                      onClick={() => setModoSel(m.id)}
+                      className={`group flex-1 rounded-lg border px-3 py-2.5 text-center transition-colors duration-300 ${
+                        modoSel === m.id
+                          ? "border-copper/80 bg-copper/15"
+                          : "border-line/80 bg-ink/40 hover:border-copper/40"
+                      }`}
+                    >
+                      <span
+                        className={`block font-mono text-[10px] uppercase tracking-[0.22em] ${
+                          modoSel === m.id ? "text-copper" : "text-cream/75"
+                        }`}
+                      >
+                        {m.nombre}
+                      </span>
+                      <span className="mt-0.5 block font-mono text-[8px] uppercase tracking-[0.14em] text-faint/70">
+                        {m.lema}
+                      </span>
+                      <span className="mt-1 block font-mono text-[9px] tabular-nums text-faint">
+                        récord {records[m.id]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
                 <button
                   type="button"
-                  onClick={() => apiRef.current?.empezar()}
+                  onClick={() => apiRef.current?.empezar(modoSel)}
                   className="group inline-flex items-center gap-3 rounded-full border border-copper/70 bg-copper/10 px-8 py-3.5 font-mono text-[11px] uppercase tracking-[0.3em] text-copper transition-colors duration-300 hover:bg-copper/20"
                 >
                   Comenzar
@@ -448,6 +527,7 @@ export default function Volateria() {
                 {stats.puntos}
               </p>
               <p className="mt-3 font-serif text-lg italic text-cream/75">
+                modo {stats.modo} ·{" "}
                 {stats.recordNuevo
                   ? "el zorro no va a olvidar esta tarde — nuevo récord"
                   : `ronda ${stats.ronda} · récord ${stats.record}`}

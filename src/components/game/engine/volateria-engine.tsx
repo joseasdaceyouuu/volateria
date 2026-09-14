@@ -129,13 +129,16 @@ import { drawGlow, glowSprite } from "../lab-fx";
 /* ── módulos de la feria (V70) — la casa ya no es un monolito ── */
 import {
   PODER_DURACION,
-  RECORD_KEY,
   VOLADA,
   esJefe,
   multOf,
-  quotaOf,
   velocidadRonda,
+  MODOS,
+  LETRAS_PREMIO,
+  cuotaModo,
+  tipoDeJefe,
 } from "./config";
+import { type Modo, type ModoId } from "./config";
 import { type Rng } from "./rng";
 import {
   ESPECIES,
@@ -196,6 +199,9 @@ export type VolateriaStats = {
   muted: boolean;
   px: number; // puntero CSS px (la feria es espacio PANTALLA)
   py: number;
+  modo: string; // cabrito · feria · veterano (V71)
+  viento: number; // fuerza del vendaval (V71)
+  letras: string; // letras del PREMIO recogidas (V71)
   patos: PatoTelemetria[];
 };
 
@@ -204,7 +210,7 @@ export type VolateriaApi = {
   disparo: (cx: number, cy: number) => void;
   recargar: () => void;
   pausa: () => void;
-  empezar: () => void;
+  empezar: (m?: ModoId) => void;
   snd: () => void;
   leave: () => void;
 };
@@ -251,6 +257,12 @@ type Pato = {
   senBaja: boolean;
   scale: number;
   flashT: number;
+  /* V71: identidad extra */
+  letra?: string; // la letra del PREMIO que trae el mensajero
+  mini?: boolean; // corona de la BANDADA REAL
+  guia?: boolean; // guía de la banda silvestre
+  lid?: number; // id de la formación
+  dyForm?: number; // hueco en la formación
 };
 
 type Pluma = {
@@ -377,6 +389,20 @@ function VolateriaEngine({
     let quackT = 200;
     let tid = 0;
 
+    /* V71: el modo manda en balas, cuota, velocidad y récord */
+    let modo: Modo = MODOS.feria;
+    let letras: string[] = [];
+    let cadena = 0; // combo aéreo
+    /* V71: el VIENTO de la feria — vendavales que empujan la banda */
+    let vientoF = 0;
+    let vientoObj = 0;
+    let vientoT = 460 + rng() * 300;
+    let vientoDuro = 0;
+    let vientoDir: 1 | -1 = 1;
+    let vientoActivo = false;
+    /* V71: la banda silvestre */
+    let bandT = 900;
+
     /* poder activo y sus trampas */
     let poder: Poder = "";
     let poderT = 0;
@@ -413,20 +439,20 @@ function VolateriaEngine({
     let juncosBack: Junco[] = [];
     let juncosFront: Junco[] = [];
 
-    const leerRecord = () => {
+    const leerRecord = (k: string) => {
       try {
-        const v = Number(localStorage.getItem(RECORD_KEY));
+        const v = Number(localStorage.getItem(k));
         return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
       } catch {
         return 0;
       }
     };
-    const guardarRecord = (v: number) => {
+    const guardarRecord = (k: string, v: number) => {
       try {
-        localStorage.setItem(RECORD_KEY, String(Math.floor(v)));
+        localStorage.setItem(k, String(Math.floor(v)));
       } catch {}
     };
-    record = leerRecord();
+    record = leerRecord(modo.recordKey);
 
     /* telemetría — UNA sola ruta, mismos campos SIEMPRE (lección V62) */
     const emit = () => {
@@ -453,7 +479,10 @@ function VolateriaEngine({
         escapes,
         tiros,
         volleyHits,
-        cuota: quotaOf(Math.max(1, ronda)),
+        cuota: cuotaModo(Math.max(1, ronda), modo),
+        modo: modo.id,
+        viento: Math.round(vientoF * 100) / 100,
+        letras: letras.join(""),
         enCola: Math.max(0, VOLADA - lanzados),
         resultados: res.slice(),
         zorro: zorro.estado === "oculto" ? 0 : 1,
@@ -645,10 +674,12 @@ function VolateriaEngine({
       const roll = rng();
       /* V67: el humo impera en rondas altas (ventana 0.37→0.41) */
       const humoTop = r >= 5 ? 0.41 : 0.37;
-      if (r >= 3 && roll < 0.1) tipo = "dorada";
-      else if (r >= 2 && roll < 0.21) tipo = "acorazado";
-      else if (r >= 2 && roll < humoTop) tipo = "humo";
-      else if (roll < 0.24 + 0.03 * Math.min(r, 6)) tipo = "zafiro";
+      if (r >= 2 && roll < 0.055) tipo = "mensajero";
+      else if (r >= 3 && roll < 0.125) tipo = "espejo";
+      else if (r >= 3 && roll < 0.215) tipo = "dorada";
+      else if (r >= 2 && roll < 0.31) tipo = "acorazado";
+      else if (r >= 2 && roll < humoTop + 0.09) tipo = "humo";
+      else if (roll < 0.30 + 0.03 * Math.min(r, 6)) tipo = "zafiro";
       const E = ESPECIES[tipo];
       /* origen aleatorio: bordes, juncos o cielo */
       const oR = rng();
@@ -670,7 +701,7 @@ function VolateriaEngine({
                 ? "zigzag"
                 : "rasante";
       const speed =
-        velocidadRonda(r) *
+        velocidadRonda(r) * modo.velocidadMul *
         E.vel *
         PATRON_VEL[patron] *
         (reduced ? 0.85 : 1) *
@@ -699,7 +730,7 @@ function VolateriaEngine({
       }
       const idx = lanzados;
       lanzados++;
-      patos.push({
+      const nuevo: Pato = {
         tid: ++tid,
         tipo,
         estado: "vuelo",
@@ -733,8 +764,15 @@ function VolateriaEngine({
         senBaja: false,
         scale: (coarse ? 1.22 : 1.5) * (tipo === "dorada" ? 0.92 : 1),
         flashT: 0,
-      });
+      };
+      patos.push(nuevo);
       if (idx >= 0 && idx < VOLADA) res[idx] = "vivo";
+      /* el mensajero trae una letra que falte del PREMIO (V71) */
+      if (tipo === "mensajero") {
+        const falta = LETRAS_PREMIO.split("").filter((l) => !letras.includes(l));
+        if (falta.length > 0)
+          nuevo.letra = falta[Math.floor(rng() * falta.length)];
+      }
       quackT = 120 + rng() * 160;
     };
 
@@ -817,6 +855,64 @@ function VolateriaEngine({
       audio.caw();
     };
 
+    /* LA BANDA (V71) — cinco minis en formación cerrada; no cuentan
+       para la cuota pero pagan bien, y sin guía se desparraman */
+    let lidGen = 0;
+    const spawnBanda = () => {
+      const dir: 1 | -1 = rng() < 0.5 ? 1 : -1;
+      const lid = ++lidGen;
+      const vel = velocidadRonda(ronda) * modo.velocidadMul * 1.35;
+      const y0 = bandaTop + 40 + rng() * Math.max(60, bandaBot - bandaTop - 80);
+      const offs: [number, number, boolean][] = [
+        [0, 0, true],
+        [-42, 16, false],
+        [-80, -12, false],
+        [42, -18, false],
+        [80, 14, false],
+      ];
+      for (const [dx, dy, esGuia] of offs) {
+        patos.push({
+          tid: ++tid,
+          tipo: "banda",
+          estado: "vuelo",
+          patron: "rasante",
+          idx: -1,
+          hp: 1,
+          x: (dir === 1 ? -90 : w + 90) - dir * dx,
+          y: y0 + dy,
+          vx: dir * vel,
+          vy: 0,
+          ivx: 0,
+          ivy: 0,
+          dir,
+          t: 0,
+          fase0: rng() * 6.2832,
+          flap: rng() * 6.2832,
+          flapRate: ESPECIES.banda.flap,
+          rot: 0,
+          fallDir: rng() < 0.5 ? 1 : -1,
+          bounced: false,
+          restT: 0,
+          fadeT: 0,
+          targetY: y0,
+          retargetT: 1e9,
+          escapeT: 1e9,
+          evadeCd: 1e9,
+          fintaT: 0,
+          fintaCd: 1e9,
+          senT: 0,
+          senBaja: false,
+          scale: coarse ? 0.72 : 0.88,
+          flashT: 0,
+          guia: esGuia,
+          lid,
+          dyForm: dy,
+        });
+      }
+      audio.quack(true);
+      audio.whoosh();
+    };
+
     /* EL PATO REAL (V68) — la corona de la feria baja a exigir tributo:
        gigante, coronado, con FASES (escolta al 70%, furia al 40%) */
     const spawnJefe = () => {
@@ -833,7 +929,7 @@ function VolateriaEngine({
         escolta: false,
         x: w * 0.5,
         y: bandaTop - 60,
-        vx: (rng() < 0.5 ? 1 : -1) * velocidadRonda(ronda) * 0.55,
+        vx: (rng() < 0.5 ? 1 : -1) * velocidadRonda(ronda) * modo.velocidadMul * 0.55,
         vy: 0,
         ivx: 0,
         ivy: 0,
@@ -874,6 +970,68 @@ function VolateriaEngine({
       if (!reduced) shakeA = Math.max(shakeA, 5);
     };
 
+    /* LA BANDADA REAL (V71) — tres coronas que vuelan juntas desde la
+       ronda 8: cada una aguanta lo suyo y el botín se reparte */
+    const spawnJefeBanda = () => {
+      const hp = 3 + Math.floor(ronda / 8);
+      const dir0: 1 | -1 = rng() < 0.5 ? 1 : -1;
+      const offs: [number, number][] = [[0, 0], [-66, 24], [66, -28]];
+      for (let i = 0; i < 3; i++) {
+        patos.push({
+          tid: ++tid,
+          tipo: "real",
+          estado: "vuelo",
+          patron: "onda",
+          idx: i,
+          hp,
+          hp0: hp,
+          mini: true,
+          enfada: false,
+          escolta: true, // las mini no llaman escolta propia
+          x: w * 0.5 + offs[i][0],
+          y: bandaTop + 60 + offs[i][1],
+          vx: dir0 * velocidadRonda(ronda) * modo.velocidadMul * 0.5,
+          vy: 0,
+          ivx: 0,
+          ivy: 0,
+          dir: dir0,
+          t: 0,
+          fase0: rng() * 6.2832,
+          flap: rng() * 6.2832,
+          flapRate: ESPECIES.real.flap,
+          rot: 0,
+          fallDir: rng() < 0.5 ? 1 : -1,
+          bounced: false,
+          restT: 0,
+          fadeT: 0,
+          targetY: bandaTop + 60 + rng() * Math.max(50, bandaBot - bandaTop - 90),
+          retargetT: 60 + rng() * 60,
+          escapeT: 1300,
+          evadeCd: 30 + rng() * 30,
+          fintaT: 0,
+          fintaCd: 1e9,
+          senT: 0,
+          senBaja: false,
+          scale: coarse ? 1.5 : 1.8,
+          flashT: 0,
+        });
+        res[i] = "vivo";
+      }
+      lanzados = VOLADA;
+      pendiente = 3;
+      cargador = Math.max(12, hp * 3 + 3);
+      balas = cargador;
+      recT = 0;
+      audio.jefe();
+      banner = {
+        txt: "LA BANDADA REAL",
+        sub: "tres coronas, una furia",
+        t: 0,
+        vida: 150,
+      };
+      if (!reduced) shakeA = Math.max(shakeA, 6);
+    };
+
     /* escolta del PATO REAL — zafiros que defienden la corona (idx −1) */
     const spawnEscolta = () => {
       const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
@@ -886,7 +1044,7 @@ function VolateriaEngine({
         hp: 1,
         x: dir === 1 ? -70 : w + 70,
         y: bandaTop + rng() * (bandaBot - bandaTop),
-        vx: dir * velocidadRonda(ronda) * 1.15,
+        vx: dir * velocidadRonda(ronda) * modo.velocidadMul * 1.15,
         vy: 0,
         ivx: 0,
         ivy: 0,
@@ -935,6 +1093,98 @@ function VolateriaEngine({
     /* el disparo se resuelve AQUÍ — síncrono, como debe ser */
     const acierta = (p: Pato) => {
       const E = ESPECIES[p.tipo];
+      /* el ESPEJO (V71) — a veces el plomo rebota y el vanidoso
+         se teletransporta una banda más allá, sano y riéndose */
+      if (p.tipo === "espejo" && p.estado === "vuelo" && rng() < 0.4) {
+        p.flashT = 3;
+        p.x = Math.max(
+          w * 0.1,
+          Math.min(w * 0.9, p.x + (rng() < 0.5 ? -1 : 1) * 90),
+        );
+        popups.push({
+          x: p.x,
+          y: p.y - 26,
+          txt: "¡reflejo!",
+          t: 0,
+          vida: 50,
+          color: "#dfe4ee",
+          serif: true,
+        });
+        audio.tinc();
+        return;
+      }
+      /* LA BANDA (V71) — al guía se le cae la formación entera;
+       a un mini, el resto se desparrama y vuela nervioso */
+      if (p.tipo === "banda") {
+        racha++;
+        const multB = multOf(racha);
+        const ptsB = E.ptos * multB;
+        puntos += ptsB;
+        hits++;
+        popups.push({
+          x: p.x,
+          y: p.y - 20,
+          txt: multB > 1 ? `+${ptsB} ×${multB}` : `+${ptsB}`,
+          t: 0,
+          vida: 50,
+          color: E.popup,
+          serif: false,
+        });
+        if (p.guia) {
+          let extra = 0;
+          for (const q of patos) {
+            if (
+              q !== p &&
+              q.tipo === "banda" &&
+              q.lid === p.lid &&
+              q.estado === "vuelo"
+            ) {
+              q.estado = "caida";
+              q.vy = -1.1 + rng() * 0.6;
+              q.flashT = 3;
+              extra++;
+              puntos += Math.round(E.ptos * multB * 0.6);
+              for (let i = 0; i < 4; i++) {
+                const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4;
+                plumas.push({
+                  x: q.x,
+                  y: q.y,
+                  vx: Math.cos(a) * (1.4 + Math.random() * 2),
+                  vy: Math.sin(a) * (1.4 + Math.random() * 2),
+                  rot: Math.random() * 6.2832,
+                  vr: (Math.random() - 0.5) * 0.24,
+                  t: 0,
+                  vida: 45 + Math.random() * 25,
+                  c: Math.random() < 0.6 ? E.ala : E.cuerpo0,
+                  s: 0.6 + Math.random() * 0.5,
+                  sway: Math.random() * 6.2832,
+                });
+              }
+            }
+          }
+          popups.push({
+            x: p.x,
+            y: p.y - 44,
+            txt: `¡la bandada! +${Math.round(E.ptos * multB * 0.6) * extra}`,
+            t: 0,
+            vida: 66,
+            color: "#f2c08c",
+            serif: true,
+          });
+          audio.ronda();
+        } else {
+          for (const q of patos) {
+            if (q.tipo === "banda" && q.estado === "vuelo")
+              q.escapeT = Math.min(q.escapeT, 140);
+          }
+        }
+        freezeT = reduced ? 0 : 2;
+        audio.silbido();
+        audio.plumas();
+        audio.quack();
+        emit();
+        return;
+      }
       /* EL PATO REAL — cada impacto le arranca una vida; la feria
          cuenta la corona en voz alta y la furia espera abajo */
       if (p.tipo === "real" && p.hp > 1) {
@@ -1026,6 +1276,52 @@ function VolateriaEngine({
         color: E.popup,
         serif: false,
       });
+      /* CADENA AÉREA (V71) — cazar antes de que el cadáver anterior
+         toque el campo: la puntería rápida cobra interés compuesto */
+      const aire = patos.some((q) => q !== p && q.estado === "caida");
+      if (aire) {
+        cadena++;
+        const bonus = 60 * cadena * Math.max(1, ronda);
+        puntos += bonus;
+        popups.push({
+          x: p.x,
+          y: p.y - 48,
+          txt: `cadena ×${cadena} +${bonus}`,
+          t: 0,
+          vida: 62,
+          color: "#e08a52",
+          serif: false,
+        });
+        audio.tinc();
+      } else cadena = 0;
+      /* el MENSAJERO entrega su letra (V71) — juntar PREMIO paga */
+      if (p.tipo === "mensajero" && p.letra && !letras.includes(p.letra)) {
+        letras.push(p.letra);
+        popups.push({
+          x: p.x,
+          y: p.y - 44,
+          txt: `letra ${p.letra}`,
+          t: 0,
+          vida: 60,
+          color: "#cfe3a0",
+          serif: true,
+        });
+        audio.poder();
+        if (letras.length >= LETRAS_PREMIO.length) {
+          const premio = 250 * Math.max(1, ronda);
+          puntos += premio;
+          banner = {
+            txt: "¡PREMIO DE LA FERIA!",
+            sub: `colección completa · +${premio}`,
+            t: 0,
+            vida: 120,
+          };
+          spawnGlobo();
+          spawnGlobo();
+          letras = []; // la colección vuelve a empezar
+          audio.corona();
+        }
+      }
       audio.silbido();
       audio.plumas();
       audio.quack();
@@ -1049,9 +1345,48 @@ function VolateriaEngine({
       }
       /* LA CORONA CAE (V68) — la feria entera celebra al rey vencido:
          botín de ronda, dos globos garantizados y la volada al completo */
+      if (p.tipo === "real" && p.mini) {
+        /* una corona de la BANDADA REAL cae (V71) — botín propio;
+           la última reparte globos y cierra la cuota entera */
+        const botin = 100 * ronda;
+        puntos += botin;
+        if (p.idx >= 0 && p.idx < 3) res[p.idx] = "acierto";
+        popups.push({
+          x: p.x,
+          y: p.y - 54,
+          txt: `corona caída +${botin}`,
+          t: 0,
+          vida: 80,
+          color: "#ffe9b0",
+          serif: true,
+        });
+        freezeT = reduced ? 0 : 5;
+        if (!reduced) shakeA = Math.max(shakeA, 9);
+        const quedan = patos.some(
+          (q) => q.mini && q !== p && q.estado === "vuelo",
+        );
+        if (!quedan) {
+          volleyHits = cuotaModo(ronda, modo);
+          banner = {
+            txt: "¡LA BANDADA REAL CAE!",
+            sub: `tres coronas por el suelo · +${botin}`,
+            t: 0,
+            vida: 130,
+          };
+          spawnGlobo();
+          spawnGlobo();
+          spawnGlobo();
+          freezeT = reduced ? 0 : 7;
+          if (!reduced) shakeA = Math.max(shakeA, 13);
+          audio.corona();
+        } else {
+          audio.tinc();
+        }
+        return;
+      }
       if (p.tipo === "real") {
         for (let i = 0; i < VOLADA; i++) res[i] = "acierto";
-        volleyHits = quotaOf(ronda);
+        volleyHits = cuotaModo(ronda, modo);
         const botin = 300 * ronda;
         puntos += botin;
         popups.push({
@@ -1379,7 +1714,7 @@ function VolateriaEngine({
       recordNuevo = puntos > record;
       if (recordNuevo) {
         record = puntos;
-        guardarRecord(puntos);
+        guardarRecord(modo.recordKey, puntos);
       }
       audio.fin();
       emit();
@@ -1388,7 +1723,7 @@ function VolateriaEngine({
     const finDeVuelta = () => {
       cerrarVuelta = false;
       for (const q of patos) q.idx = -1; // los cadáveres dejan de contar
-      if (volleyHits >= quotaOf(ronda)) {
+      if (volleyHits >= cuotaModo(ronda, modo)) {
         /* VOLADA PERFECTA (V68) — ocho de ocho sin una fuga: la feria
            paga el respeto en puntos y en fanfarria */
         const perfecta =
@@ -1413,17 +1748,21 @@ function VolateriaEngine({
           5: "cuota 7 · la noche cae",
           6: "oleadas gruesas",
           7: "8 de 8 · ronda perfecta",
-          8: "la corona vuelve por su revancha",
+          8: "tres coronas buscan revancha",
           10: "el zorro ya te teme",
         };
         banner = {
           txt:
             esJefe(ronda)
-              ? "EL PATO REAL"
+              ? tipoDeJefe(ronda) === "banda"
+                ? "LA BANDADA REAL"
+                : "EL PATO REAL"
               : `RONDA ${ronda}`,
           sub:
             esJefe(ronda)
-              ? "derriba la corona"
+              ? tipoDeJefe(ronda) === "banda"
+                ? "tres coronas, una furia"
+                : "derriba la corona"
               : (premio > 0
                   ? `volada perfecta +${premio} · `
                   : "") +
@@ -1449,21 +1788,31 @@ function VolateriaEngine({
        Cada cuatro rondas (V68) la volada entera es UNA: el PATO REAL */
     const lanzarOleada = () => {
       if (esJefe(ronda)) {
-        spawnJefe();
+        if (tipoDeJefe(ronda) === "banda") spawnJefeBanda();
+        else spawnJefe();
         emit();
         return;
       }
       const size = plan.length > 0 ? (plan.shift() ?? 1) : 1;
       pendiente = size;
-      cargador = 3 * size;
+      cargador = modo.balasBase * size;
       balas = cargador;
       recT = 0;
       for (let i = 0; i < size; i++) spawnDuck();
       emit();
     };
 
-    const empezar = () => {
+    const empezar = (m?: ModoId) => {
       audio.gesto();
+      if (m && MODOS[m]) modo = MODOS[m];
+      letras = [];
+      cadena = 0;
+      bandT = 900;
+      vientoF = 0;
+      vientoObj = 0;
+      vientoActivo = false;
+      vientoDuro = 0;
+      vientoT = 460 + rng() * 300;
       ronda = 1;
       puntos = 0;
       recordNuevo = false;
@@ -1475,8 +1824,8 @@ function VolateriaEngine({
       lanzados = 0;
       pendiente = 0;
       plan = construirPlan(1);
-      cargador = 3;
-      balas = 3;
+      cargador = modo.balasBase;
+      balas = modo.balasBase;
       recT = 0;
       poder = "";
       poderT = 0;
@@ -1498,7 +1847,7 @@ function VolateriaEngine({
       freezeT = 0;
       shakeA = 0;
       flash = 0;
-      record = leerRecord();
+      record = leerRecord(modo.recordKey);
       fase = "jugando";
       audio.empieza();
       emit();
@@ -1566,6 +1915,45 @@ function VolateriaEngine({
         if (globos.length === 0 && lanzados >= 1) spawnGlobo();
         globoT = 560 + Math.random() * 420;
       }
+      /* V71: la banda silvestre — desde la ronda 4, sin límite de cuota */
+      if (ronda >= 4 && lanzados >= 1 && !esJefe(ronda)) {
+        bandT -= dt;
+        if (bandT <= 0) {
+          if (!patos.some((p) => p.tipo === "banda" && p.estado === "vuelo"))
+            spawnBanda();
+          bandT = 760 + rng() * 520;
+        }
+      }
+
+      /* V71: EL VIENTO — vendavales que empujan la banda; los juncos
+         son el telegráfo y el silbido el aviso. Desde la ronda 2. */
+      if (vientoT > 0) vientoT -= dt;
+      if (vientoActivo) {
+        vientoF += (vientoObj - vientoF) * (1 - Math.pow(0.94, dt));
+        vientoDuro -= dt;
+        if (vientoDuro <= 0) {
+          vientoActivo = false;
+          vientoT = 480 + rng() * 420;
+        }
+      } else {
+        vientoF *= Math.pow(0.9, dt);
+        if (vientoT <= 0 && ronda >= 2) {
+          vientoActivo = true;
+          vientoDir = rng() < 0.5 ? -1 : 1;
+          vientoObj = vientoDir * Math.min(1.5, 0.55 + rng() * 0.7);
+          vientoDuro = 200 + rng() * 120;
+          audio.whoosh();
+          popups.push({
+            x: w * 0.5,
+            y: bandaTop - 14,
+            txt: vientoDir > 0 ? "VIENTO →" : "← VIENTO",
+            t: 0,
+            vida: 80,
+            color: "rgba(250,246,236,0.6)",
+            serif: true,
+          });
+        }
+      }
 
       /* quack ambiental — la feria está habitada */
       if (quackT > 0) {
@@ -1586,7 +1974,26 @@ function VolateriaEngine({
         p.flashT = Math.max(0, p.flashT - dt);
 
         if (p.estado === "vuelo") {
-          if (p.patron === "poste") {
+          /* V71: la BANDA sigue al guía — sin guía, libre y nerviosa */
+          if (p.tipo === "banda" && !p.guia) {
+            p.flap += p.flapRate * dtD;
+            const guia = patos.find(
+              (q) => q.tipo === "banda" && q.guia && q.lid === p.lid,
+            );
+            if (guia && guia.estado === "vuelo") {
+              p.vx = guia.vx;
+              p.x += (guia.vx + p.ivx + vientoF * 0.8) * dtD;
+              p.y +=
+                (guia.y + (p.dyForm ?? 0) - p.y) * Math.min(1, 0.14 * dtD);
+            } else {
+              p.x += (p.vx + vientoF * 0.8) * dtD;
+              p.y += Math.sin(p.t * 0.2 + p.fase0) * 1.1 * dtD;
+            }
+            if (p.x < -110 || p.x > w + 110) {
+              patos.splice(i, 1);
+              emit();
+            }
+          } else if (p.patron === "poste") {
             /* el SEÑUELO: sube rígido, flota un rato, se hunde */
             if (p.senBaja) {
               p.vy = 1.9;
@@ -1609,7 +2016,7 @@ function VolateriaEngine({
             /* el CUERVO: atraviesa la banda con zigzag cerrado */
             p.flap += p.flapRate * dtD;
             const vyC = Math.sin(p.t * 0.11 + p.fase0) * 1.7;
-            p.x += p.vx * dtD;
+            p.x += (p.vx + vientoF * 0.9) * dtD;
             p.y += (vyC + p.ivy) * dtD;
             p.ivy *= Math.pow(0.9, dtD);
             if (p.y < bandaTop - 20) p.y = bandaTop - 20;
@@ -1745,7 +2152,7 @@ function VolateriaEngine({
               vyPat =
                 Math.sin(p.t * 0.05 + p.fase0) * 0.42 +
                 (p.targetY - p.y) * 0.0045;
-            p.x += (p.vx * fintaMul + p.ivx) * dtD;
+            p.x += (p.vx * fintaMul + p.ivx + vientoF * 1.05) * dtD;
             p.y += (vyPat * fintaMul + p.ivy) * dtD;
             /* bordes — el pato regresa a la feria */
             if (p.dir === 1 && p.x > w * 0.94) {
@@ -1800,6 +2207,7 @@ function VolateriaEngine({
             if (p.escapeT <= 0) {
               p.estado = "fuga";
               p.vy = -2.4;
+              cadena = 0;
               if (p.idx >= 0 && p.idx < VOLADA) {
                 res[p.idx] = "fuga";
                 escapes++;
@@ -1843,6 +2251,7 @@ function VolateriaEngine({
             } else {
               p.estado = "suelto";
               p.restT = 46;
+              cadena = 0;
               p.y = grassY - 14;
               p.rot = p.fallDir > 0 ? 2.6 : -2.6;
               if (p.idx >= 0 && p.idx < VOLADA) {
@@ -1879,7 +2288,7 @@ function VolateriaEngine({
         f.vy += 0.055 * dt;
         f.vx *= Math.pow(0.985, dt);
         f.vy *= Math.pow(0.99, dt);
-        f.x += f.vx * dt + Math.sin((f.t + f.sway) * 0.15) * 0.5;
+        f.x += f.vx * dt + Math.sin((f.t + f.sway) * 0.15) * 0.5 + vientoF * 0.5 * dt;
         f.y += f.vy * dt;
         f.rot += f.vr * dt;
         if (f.t > f.vida || f.y > grassY + 8) plumas.splice(i, 1);
@@ -2192,6 +2601,49 @@ function VolateriaEngine({
         c.fillRect(4.2, 13, 4, 2.4);
       }
 
+      /* V71 — el ESPEJO: veta de luz vanidosa que titila */
+      if (p.tipo === "espejo") {
+        c.strokeStyle = "rgba(255,255,255,0.72)";
+        c.lineWidth = 2.2;
+        c.beginPath();
+        c.moveTo(-13, -7);
+        c.lineTo(9, -13);
+        c.stroke();
+        c.globalAlpha = 0.45 + 0.3 * Math.sin(p.t * 0.3);
+        c.strokeStyle = "#ffffff";
+        c.lineWidth = 1.1;
+        c.beginPath();
+        c.arc(24.5, -16.5, 4.6, 0, 6.2832);
+        c.stroke();
+        c.globalAlpha = 1;
+      }
+
+      /* V71 — el MENSAJERO: la carta del PREMIO al cuello (letra
+         legible: se desespeja el contexto antes de escribir) */
+      if (p.tipo === "mensajero" && p.letra) {
+        c.strokeStyle = "rgba(60,44,18,0.75)";
+        c.lineWidth = 1;
+        c.beginPath();
+        c.moveTo(14, -6);
+        c.quadraticCurveTo(8, 10, 2, 14);
+        c.stroke();
+        c.fillStyle = "#f3e6c2";
+        c.save();
+        c.translate(2, 19);
+        c.rotate(0.12);
+        c.fillRect(-7, -5.5, 14, 11);
+        c.strokeStyle = "#8a6522";
+        c.lineWidth = 1;
+        c.strokeRect(-7, -5.5, 14, 11);
+        c.scale(p.dir, 1);
+        c.fillStyle = "#3a2410";
+        c.font = "700 9px \"JetBrains Mono\", ui-monospace, monospace";
+        c.textAlign = "center";
+        c.textBaseline = "middle";
+        c.fillText(p.letra, 0, 0.5);
+        c.restore();
+      }
+
       /* la corona del PATO REAL — oro macizo con rubí (V68) */
       if (p.tipo === "real") {
         c.fillStyle = "#e8c04f";
@@ -2322,7 +2774,9 @@ function VolateriaEngine({
     function dibujarJuncos(c: CanvasRenderingContext2D, arr: Junco[]) {
       c.lineCap = "round";
       for (const j of arr) {
-        const sway = Math.sin(tGlobal * 0.9 + j.x * 0.012) * (2.2 + j.h * 0.02);
+        const sway =
+          Math.sin(tGlobal * 0.9 + j.x * 0.012) * (2.2 + j.h * 0.02) +
+          vientoF * (13 + j.h * 0.16);
         c.strokeStyle = j.c;
         c.lineWidth = j.lw;
         c.beginPath();
@@ -2725,7 +3179,7 @@ function VolateriaEngine({
         disparo,
         recargar,
         pausa: togglePausa,
-        empezar,
+        empezar: (m?: ModoId) => empezar(m),
         snd: () => {
           audio.snd();
           emit();
