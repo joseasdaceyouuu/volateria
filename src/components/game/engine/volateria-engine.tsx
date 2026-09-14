@@ -125,6 +125,7 @@
 
 import { memo, useEffect, useRef } from "react";
 import { drawGlow, glowSprite } from "../lab-fx";
+import { leeAjustes, type Ajustes } from "../ajustes";
 
 /* ── módulos de la feria (V70) — la casa ya no es un monolito ── */
 import {
@@ -221,6 +222,7 @@ export type VolateriaApi = {
   disparo: (cx: number, cy: number) => void;
   recargar: () => void;
   pausa: () => void;
+  ajustes: (a: Partial<Ajustes>) => void;
   empezar: (
     m?: ModoId,
     opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
@@ -369,6 +371,22 @@ function VolateriaEngine({
        Volada del Día planta la semilla (V72) y la feria repite
        el mismo vuelo para todo el planeta */
     let rng: Rng = Math.random;
+
+    /* V73: los ajustes del cazador — el motor obedece a la sala */
+    let aj: Ajustes = leeAjustes();
+    audio.setVolumen(aj.volumen);
+    /* el temblor de la casa — respeta reduced-motion y el slider */
+    const sacude = (n: number) => {
+      const mul = reduced ? 0 : aj.shake;
+      if (mul > 0) shakeA = Math.max(shakeA, n * mul);
+    };
+    /* la vibración — haptics corteses, solo donde el aparato ava */
+    const vibra = (p: number | number[]) => {
+      try {
+        if (aj.haptics && !reduced && "vibrate" in navigator)
+          navigator.vibrate(p as number);
+      } catch {}
+    };
 
     /* ── estado del juego — la única fuente de verdad ── */
     let w = 960;
@@ -994,7 +1012,8 @@ function VolateriaEngine({
         t: 0,
         vida: 140,
       };
-      if (!reduced) shakeA = Math.max(shakeA, 5);
+      sacude(5);
+      vibra([60, 40, 60]);
     };
 
     /* LA BANDADA REAL (V71) — tres coronas que vuelan juntas desde la
@@ -1056,7 +1075,8 @@ function VolateriaEngine({
         t: 0,
         vida: 150,
       };
-      if (!reduced) shakeA = Math.max(shakeA, 6);
+      sacude(6);
+      vibra([60, 40, 60]);
     };
 
     /* escolta del PATO REAL — zafiros que defienden la corona (idx −1) */
@@ -1138,6 +1158,7 @@ function VolateriaEngine({
           serif: true,
         });
         audio.tinc();
+        vibra(10);
         return;
       }
       /* LA BANDA (V71) — al guía se le cae la formación entera;
@@ -1207,6 +1228,8 @@ function VolateriaEngine({
           }
         }
         freezeT = reduced ? 0 : 2;
+        sacude(4);
+        vibra(10);
         audio.silbido();
         audio.plumas();
         audio.quack();
@@ -1221,7 +1244,8 @@ function VolateriaEngine({
         p.ivx += (p.x < xp ? -1 : 1) * 4.2;
         p.ivy -= 1.4;
         freezeT = reduced ? 0 : 4;
-        if (!reduced) shakeA = Math.max(shakeA, 6);
+        sacude(6);
+        vibra(12);
         popups.push({
           x: p.x,
           y: p.y - 40 * p.scale * 0.5,
@@ -1290,6 +1314,7 @@ function VolateriaEngine({
       p.vy = -1.3;
       porEspecie[p.tipo] = (porEspecie[p.tipo] ?? 0) + 1;
       freezeT = reduced ? 0 : 3; // hitstop — el mundo contiene el aliento
+      vibra(15);
       racha++;
       const mult = multOf(racha);
       const pts = E.ptos * mult;
@@ -1391,7 +1416,7 @@ function VolateriaEngine({
           serif: true,
         });
         freezeT = reduced ? 0 : 5;
-        if (!reduced) shakeA = Math.max(shakeA, 9);
+        sacude(9);
         const quedan = patos.some(
           (q) => q.mini && q !== p && q.estado === "vuelo",
         );
@@ -1407,11 +1432,13 @@ function VolateriaEngine({
           spawnGlobo();
           spawnGlobo();
           freezeT = reduced ? 0 : 7;
-          if (!reduced) shakeA = Math.max(shakeA, 13);
+          sacude(13);
+          vibra([30, 30, 30, 30, 90]);
           audio.corona();
         } else {
           audio.tinc();
           jefesRun++;
+          vibra(20);
         }
         return;
       }
@@ -1439,7 +1466,8 @@ function VolateriaEngine({
         spawnGlobo();
         spawnGlobo();
         freezeT = reduced ? 0 : 6;
-        if (!reduced) shakeA = Math.max(shakeA, 13);
+        sacude(13);
+        vibra([30, 30, 30, 30, 90]);
         for (let i = 0; i < 26; i++) {
           const a = Math.random() * 6.2832;
           const s = 1.8 + Math.random() * 3.4;
@@ -1464,6 +1492,7 @@ function VolateriaEngine({
     /* le diste al ENGAÑO — la feria cobra su precio */
     const pegaCebo = (p: Pato) => {
       racha = 0;
+      vibra(30);
       if (p.tipo === "senuelo") {
         puntos = Math.max(0, puntos - 150);
         popups.push({
@@ -1594,8 +1623,8 @@ function VolateriaEngine({
       balas--;
       tiros++;
       kick = 1;
-      flash = 1;
-      shakeA = reduced ? 0 : 7;
+      flash = aj.flash ? 1 : 0;
+      sacude(7);
       anillos.push({ x: cx, y: cy, t: 0 });
       const escopeta = poder === "escopeta";
       for (let i = 0, n = escopeta ? 12 : 6; i < n; i++) {
@@ -1622,7 +1651,7 @@ function VolateriaEngine({
         const dx = p.x - cx;
         const dy = p.y - cy;
         const d2 = dx * dx + dy * dy;
-        const R = 46 * (0.82 + p.scale * 0.3) * esc;
+        const R = 46 * (0.82 + p.scale * 0.3) * esc * (aj.asistencia ? 1.35 : 1);
         if (d2 < R * R) {
           presas.push(p);
           dists.push(d2);
@@ -1788,7 +1817,8 @@ function VolateriaEngine({
           puntos += premio;
           perfectasRun++;
           audio.perfecta();
-          if (!reduced) shakeA = Math.max(shakeA, 5);
+          sacude(5);
+          vibra(20);
         }
         ronda++;
         volleyHits = 0;
@@ -2154,7 +2184,8 @@ function VolateriaEngine({
                   color: "#ff8a5c",
                   serif: true,
                 });
-                if (!reduced) shakeA = Math.max(shakeA, 7);
+                sacude(7);
+                vibra(25);
                 audio.caw();
                 audio.whoosh();
               }
@@ -2305,6 +2336,7 @@ function VolateriaEngine({
                 res[p.idx] = "fuga";
                 escapes++;
                 racha = 0;
+                vibra(18);
                 popups.push({
                   x: Math.min(w - 80, Math.max(80, p.x)),
                   y: 96,
@@ -2340,7 +2372,7 @@ function VolateriaEngine({
               p.vy *= -0.36;
               p.y = grassY - 14;
               audio.golpeTierra();
-              if (!reduced) shakeA = Math.max(shakeA, 4);
+              sacude(4);
             } else {
               p.estado = "suelto";
               p.restT = 46;
@@ -3087,7 +3119,7 @@ function VolateriaEngine({
 
     function dibujarMira(c: CanvasRenderingContext2D) {
       if (fase !== "jugando" || !puntero.inside) return;
-      const k = 1 + kick * 0.45;
+      const k = (1 + kick * 0.45) * (aj.miraGrande ? 1.5 : 1);
       const col =
         balas > 0 && recT <= 0
           ? "rgba(250,246,236,0.92)"
@@ -3187,8 +3219,8 @@ function VolateriaEngine({
       dibujarJuncos(c, juncosFront);
       for (const a of anillos) {
         const al = 1 - a.t / 14;
-        if (a.t < 5) {
-          /* fogonazo — el cañón respira luz */
+        if (a.t < 5 && aj.flash) {
+          /* fogonazo — el cañón respira luz (cortesía si hay ajuste) */
           c.save();
           c.globalAlpha = al * 0.85;
           drawGlow(c, SPR.fuego, a.x, a.y, 22 + a.t * 12);
@@ -3272,6 +3304,11 @@ function VolateriaEngine({
         disparo,
         recargar,
         pausa: togglePausa,
+        ajustes: (a: Partial<Ajustes>) => {
+          aj = { ...aj, ...a };
+          audio.setVolumen(aj.volumen);
+          emit();
+        },
         empezar: (
           m?: ModoId,
           opts?: { continuar?: RunSnapshot | null; diaria?: boolean },

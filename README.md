@@ -2,14 +2,33 @@
 
 **El tiro al pato de feria, reimaginado.** Un arcade de caza completo en el
 navegador: oleadas veloces con vuelo evasivo, señuelos traidores, globos de
-poder y **EL PATO REAL** — un jefe coronado que aparece cada cuatro rondas.
+poder, jefes rotativos (EL PATO REAL y LA BANDADA REAL), viento de feria,
+tres modos de juego, Volada del Día y una feria con memoria. Instalable
+como app (PWA) y jugable offline.
 
 Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria
+## La feria (v1.2.0)
 
+- **Tres modos** — CABRITO (5 balas, cuota−1), FERIA (la casa manda) y
+  VETERANO (2 balas, cuota+1, ×1.15): cada uno con su récord.
+- **Volada del Día** — semilla diaria compartida: todos los cazadores del
+  planeta vuelan los mismos patos; sello del resultado y texto
+  spoiler-free para compartir (Web Share API con fallback a copiar).
+- **La feria con memoria** — trofeos con medallera y toast, EL ARCHIVO DEL
+  CAZADOR (estadísticas de vida + bestiario) y run recuperable si un
+  refresh interrumpe la tarde (CONTINUAR en el cartel).
+- **Viento de feria** — vendavales desde la ronda 2: los juncos son el
+  telegráfo, el silbido el aviso, y los patos no vuelan en línea recta.
+- **Cadena aérea** — cazar antes de que el cadáver anterior toque el campo
+  paga interés compuesto (×ronda por eslabón).
+- **Bestiario nuevo** — la BANDA (5 minis en formación: al guía se le cae
+  la bandada entera), el ESPEJO (a veces el plomo rebota) y el MENSAJERO
+  (trae letras del PREMIO: complétalo y la feria paga).
+- **Jefes rotativos** — ronda 4 EL PATO REAL, ronda 8 LA BANDADA REAL
+  (tres coronas), alternando cada cuatro rondas para siempre.
 - **Oleadas progresivas** — la cuota crece (5 → 8 aciertos), la velocidad no
   tiene techo y desde la ronda 8 entran volleys de 4 patos con cargador de 12.
 - **5 especies + 2 engaños** — bronce, zafiro, acorazado, humo y dorada;
@@ -32,10 +51,22 @@ como proyecto independiente.
 
 ## Oficio
 
-- Canvas 2D sobre atardecer WebGL que envejece a noche con las rondas.
-- Audio 100 % sintetizado con WebAudio — cero assets, cero dependencias.
+- Canvas 2D sobre atardecer WebGL que envejece a noche con las rondas
+  (a resolución reducida: el fbm de las nubes era lo más caro).
+- **Motor modular** — config · rng · especies · audio · cielo · ajustes ·
+  meta, con la misma partida y la misma API pública.
+- Audio 100 % sintetizado con WebAudio: compresor en el máster, volumen
+  continuo, bajo de mano caliente con el ×3/×4 y grillos de noche.
+- **Ajustes de accesibilidad persistidos** — fogonazos, temblor
+  (nada/medio/completo), mira grande, asistencia de puntería, volumen y
+  vibración (pautas de Game Accessibility Guidelines).
+- **PWA instalable y offline** — manifest + service worker + iconos.
+- **CI** — GitHub Actions: tsc strict + eslint + build standalone + sonda
+  Playwright end-to-end en cada push; CSP dura y LICENSE MIT.
 - Hitstop, screen-shake, plumas con gravedad y juice de arcade.
 - `prefers-reduced-motion` respetado, táctil soportado (tap para disparar).
+- RNG seedeable (mulberry32) solo para la aleatoriedad que afecta al
+  estado: la Volada del Día es reproducible en cualquier máquina.
 - Telemetría de QA en `window.__labD05Dbg` (objeto plano, forma estable) +
   sonda Playwright en `scripts/probe.mjs`.
 

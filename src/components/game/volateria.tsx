@@ -31,6 +31,12 @@ import {
   PODER_DURACION,
   type ModoId,
 } from "./engine/config";
+import {
+  guardaAjustes,
+  leeAjustes,
+  type Ajustes,
+} from "./ajustes";
+import PwaRegister from "./pwa-register";
 import VolateriaEngine, {
   type VolateriaApi,
   type VolateriaStats,
@@ -137,6 +143,17 @@ export default function Volateria() {
   );
   const [toast, setToast] = useState<{ txt: string; sub: string } | null>(null);
   const [shareTxt, setShareTxt] = useState("");
+  /* V73: el panel del cazador — flash, temblor, mira, asistencia */
+  const [ajustes, setAjustes] = useState<Ajustes>(() => leeAjustes());
+  const [ajustesAbierto, setAjustesAbierto] = useState(false);
+  const setAj = useCallback((p: Partial<Ajustes>) => {
+    setAjustes((prev) => {
+      const n = { ...prev, ...p };
+      guardaAjustes(n);
+      apiRef.current?.ajustes(p);
+      return n;
+    });
+  }, []);
 
   /* trofeos — se vigilan en cada telemetría; el ref evita releer */
   const trofeosRef = useRef(trofeos);
@@ -248,6 +265,7 @@ export default function Volateria() {
 
   return (
     <GameFrame>
+      <PwaRegister />
       <div
         role="application"
         aria-label="Escenario de VOLATERÍA: apunta con el cursor y dispara a los patos"
@@ -569,6 +587,14 @@ export default function Volateria() {
                     <span aria-hidden>▦</span>
                     El archivo
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setAjustesAbierto(true)}
+                    className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-5 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                  >
+                    <span aria-hidden>⚙</span>
+                    Ajustes
+                  </button>
                 </div>
                 <SoundBtn
                   on={!stats.muted}
@@ -856,6 +882,134 @@ export default function Volateria() {
                       </span>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* V73: EL PANEL DEL CAZADOR — la feria se adapta a ti */}
+        {ajustesAbierto && (
+          <div
+            data-volateria-ui
+            className="absolute inset-0 z-[96] grid place-items-center bg-[#0a0908]/70 backdrop-blur-[3px]"
+          >
+            <div className="w-full max-w-md px-6">
+              <div className="border border-line/80 bg-ink/85 p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-copper">
+                    Ajustes
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setAjustesAbierto(false)}
+                    aria-label="Cerrar los ajustes"
+                    className="rounded-full border border-line px-3 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                  >
+                    cerrar
+                  </button>
+                </div>
+
+                <div className="mt-5 space-y-3.5">
+                  {(
+                    [
+                      ["flash", "Fogonazos", "la luz del cañón y el cielo"],
+                      ["miraGrande", "Mira grande", "×1.5 — para ojos cansados"],
+                      ["asistencia", "Asistencia", "la mira engancha un poco más"],
+                      ["haptics", "Vibración", "en aparatos que la soporten"],
+                    ] as const
+                  ).map(([k, nombre, desc]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      role="switch"
+                      aria-checked={ajustes[k]}
+                      onClick={() => setAj({ [k]: !ajustes[k] } as Partial<Ajustes>)}
+                      className="flex w-full items-center justify-between gap-3 border border-line/70 bg-[#0d0c0a] px-3.5 py-2.5 text-left transition-colors duration-300 hover:border-copper/40"
+                    >
+                      <span>
+                        <span className="block font-mono text-[10px] uppercase tracking-[0.22em] text-cream/90">
+                          {nombre}
+                        </span>
+                        <span className="mt-0.5 block font-mono text-[9px] text-faint/70">
+                          {desc}
+                        </span>
+                      </span>
+                      <span
+                        aria-hidden
+                        className={`flex h-5 w-9 shrink-0 items-center rounded-full border px-0.5 transition-colors duration-300 ${
+                          ajustes[k]
+                            ? "border-copper/70 bg-copper/30"
+                            : "border-line bg-transparent"
+                        }`}
+                      >
+                        <span
+                          className={`h-3.5 w-3.5 rounded-full transition-all duration-300 ${
+                            ajustes[k]
+                              ? "translate-x-3.5 bg-copper"
+                              : "translate-x-0 bg-faint/50"
+                          }`}
+                        />
+                      </span>
+                    </button>
+                  ))}
+
+                  {/* el temblor — tres niveles, como en la casa buena */}
+                  <div className="border border-line/70 bg-[#0d0c0a] px-3.5 py-2.5">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-cream/90">
+                      Temblor
+                    </p>
+                    <div
+                      role="radiogroup"
+                      aria-label="Intensidad del temblor"
+                      className="mt-2 flex gap-2"
+                    >
+                      {(
+                        [
+                          [0, "Nada"],
+                          [0.5, "Medio"],
+                          [1, "Completo"],
+                        ] as const
+                      ).map(([v, nombre]) => (
+                        <button
+                          key={nombre}
+                          type="button"
+                          role="radio"
+                          aria-checked={ajustes.shake === v}
+                          onClick={() => setAj({ shake: v })}
+                          className={`flex-1 rounded-sm border px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] transition-colors duration-300 ${
+                            ajustes.shake === v
+                              ? "border-copper/70 bg-copper/15 text-copper"
+                              : "border-line/70 text-faint/70 hover:border-copper/40"
+                          }`}
+                        >
+                          {nombre}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* el volumen — el máster de la feria */}
+                  <div className="border border-line/70 bg-[#0d0c0a] px-3.5 py-2.5">
+                    <div className="flex items-center justify-between">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-cream/90">
+                        Volumen
+                      </p>
+                      <p className="font-mono text-[10px] tabular-nums text-copper">
+                        {Math.round(ajustes.volumen * 100)}%
+                      </p>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.02}
+                      value={ajustes.volumen}
+                      onChange={(e) => setAj({ volumen: Number(e.target.value) })}
+                      aria-label="Volumen general"
+                      className="mt-2 w-full accent-[#d97a35]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

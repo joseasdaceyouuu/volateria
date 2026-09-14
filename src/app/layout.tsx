@@ -27,6 +27,17 @@ const SITE_URL =
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: "VOLATERÍA — el tiro al pato de feria, reimaginado",
+  /* V73: PWA instalable + iconos táctiles */
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "VOLATERÍA",
+  },
   description:
     "Oleadas veloces, señuelos traidores, globos de poder y EL PATO REAL cada cuatro rondas. Atardecer WebGL que envejece a noche, hitstop, screen-shake, plumas y sonido 100% sintetizado con WebAudio. Récord en tu navegador.",
   keywords: [
