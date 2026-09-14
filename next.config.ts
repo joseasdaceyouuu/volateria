@@ -21,6 +21,26 @@ const nextConfig: NextConfig = {
             key: "Permissions-Policy",
             value: "camera=(), microphone=(), geolocation=()",
           },
+          /* V70 — CSP: la feria es autosuficiente (cero recursos
+             externos); inline permitido porque Next hidrata con
+             scripts embebidos y el modo dev necesita eval */
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: blob:",
+              "font-src 'self' data:",
+              "connect-src 'self'",
+              "worker-src 'self' blob:",
+              "manifest-src 'self'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'none'",
+              "object-src 'none'",
+            ].join("; "),
+          },
         ],
       },
     ];

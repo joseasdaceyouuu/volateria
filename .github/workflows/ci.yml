@@ -1,0 +1,91 @@
+# VOLATERÍA — QA de la feria: type-check, lint, build standalone y sonda Playwright.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  qa:
+    name: qa — build y sonda end-to-end
+    runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      # 1 · Traer el repo (el checkout deja el workspace en la raíz del repo)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2 · Bun latest (el repo viaja con bun.lock)
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # 3 · Dependencias exactas del lockfile
+      - name: Instalar dependencias
+        run: bun install --frozen-lockfile
+
+      # 4 · Tipado estricto sin emitir
+      - name: Type-check
+        run: bunx tsc --noEmit
+
+      # 5 · Lint con la config estricta del repo
+      - name: Lint
+        run: bun run lint
+
+      # 6 · next build + postbuild.mjs (copia static/ al standalone)
+      - name: Build (standalone)
+        run: bun run build
+
+      # 7 · Servir la feria en background y esperar hasta 60 s
+      - name: Levantar servidor standalone
+        run: |
+          PORT=3000 HOSTNAME=127.0.0.1 node .next/standalone/server.js &
+          echo $! > server.pid
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/ > /dev/null 2>&1; then
+              echo "Feria servida en http://127.0.0.1:3000 tras ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::El servidor standalone no respondió en 60 s"
+          exit 1
+
+      # 8 · playwright no es dependencia del repo (la sonda lo importa pero
+      #     no está en package.json): se instala al margen y se enlaza en
+      #     node_modules para que `node scripts/probe.mjs` lo resuelva.
+      - name: Instalar módulo playwright de la sonda
+        run: |
+          PWDIR="$RUNNER_TEMP/pw"
+          npm install --prefix "$PWDIR" --no-save --no-package-lock --silent playwright
+          ln -s "$PWDIR/node_modules/playwright" node_modules/playwright
+          ln -s "$PWDIR/node_modules/playwright-core" node_modules/playwright-core
+
+      # 9 · Navegador chromium para la sonda (con deps del sistema)
+      - name: Instalar navegador chromium
+        run: bunx playwright install --with-deps chromium
+
+      # 10 · Sonda QA end-to-end: imprime PASS/FAIL y sale con código != 0 si hay fallos
+      - name: Sonda QA end-to-end
+        run: BASE=http://127.0.0.1:3000 bun run probe
+
+      # 11 · La sonda escribe sus capturas FUERA del repo (../download/).
+      #      Se copian al workspace y se suben SIEMPRE, pasen o fallen los pasos.
+      - name: Copiar capturas al workspace
+        if: always()
+        run: |
+          mkdir -p download/audit-volateria
+          [ -d ../download/audit-volateria ] && cp -r ../download/audit-volateria/. download/audit-volateria/
+          ls -l download/audit-volateria || true
+
+      - name: Subir artefacto de capturas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capturas-sonda-volateria
+          path: download/audit-volateria/
+          if-no-files-found: warn

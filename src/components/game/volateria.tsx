@@ -25,6 +25,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GameFrame, SoundBtn } from "./game-frame";
+import { PODER_DURACION } from "./engine/config";
 import VolateriaEngine, {
   type VolateriaApi,
   type VolateriaStats,
@@ -271,7 +272,14 @@ export default function Volateria() {
                       stats.poder === "escopeta" ? "bg-copper" : "bg-[#7fd4c2]"
                     }`}
                     style={{
-                      width: `${Math.min(100, (stats.poderT / 380) * 100)}%`,
+                      width: `${Math.min(
+                        100,
+                        (stats.poderT /
+                          (stats.poder === "escopeta"
+                            ? PODER_DURACION.escopeta
+                            : PODER_DURACION.tiempo)) *
+                          100,
+                      )}%`,
                     }}
                   />
                 </span>

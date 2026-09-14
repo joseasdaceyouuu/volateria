@@ -52,8 +52,9 @@ export const viewport: Viewport = {
   themeColor: "#0a0908",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  /* V70: el zoom ya no se bloquea (WCAG 1.4.4) — el juego ya usa
+     touch-action: none, que es la herramienta correcta para que los
+     gestos no estorben al disparo */
 };
 
 export default function RootLayout({

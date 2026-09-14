@@ -109,14 +109,46 @@
    poder tejidos a mano.
 
    V69 — AUDITORÍA: PAUSA real (ESC/P/botón — el mundo Y el audio se
-   detienen), recarga automática en táctil (no hay tecla R en el
-   bolsillo), el cielo RESUCITA tras webglcontextrestored (antes
-   quedaba en fallback para siempre), cierre limpio del AudioContext
-   al desmontar y teclado que respeta los atajos del sistema
-   (Cmd/Ctrl/Alt). */
+   detienen), recarga automática en punteros coarse, el cielo RESUCITA
+   tras webglcontextrestored (antes quedaba en fallback para siempre),
+   cierre limpio del AudioContext al desmontar y teclado que respeta
+   los atajos del sistema (Cmd/Ctrl/Alt).
+
+   V70 — FUNDACIÓN: la casa ya no es un monolito. El motor se abre en
+   módulos (config · rng · especies · audio · cielo) con la MISMA API
+   pública y la misma partida: tunables en una sola fuente de verdad
+   (el HUD ya no adivina), compresor en el máster, volumen continuo,
+   bajo de mano caliente, grillos de noche, RNG seedeable solo para la
+   aleatoriedad que afecta al estado (la Volada del Día llega en V72)
+   y el cielo rinde a 0.66 — el fbm de nubes era lo más caro y no se
+   ve la diferencia. */
 
 import { memo, useEffect, useRef } from "react";
 import { drawGlow, glowSprite } from "../lab-fx";
+
+/* ── módulos de la feria (V70) — la casa ya no es un monolito ── */
+import {
+  PODER_DURACION,
+  RECORD_KEY,
+  VOLADA,
+  esJefe,
+  multOf,
+  quotaOf,
+  velocidadRonda,
+} from "./config";
+import { type Rng } from "./rng";
+import {
+  ESPECIES,
+  PATRON_VEL,
+  PODER_COLOR,
+  type EstadoPato,
+  type GloboPoder,
+  type Patron,
+  type Poder,
+  type TipoPato,
+} from "./especies";
+import { VolateriaAudio } from "./audio";
+import { armaCielo } from "./cielo";
 
 /* ── tipos públicos — la sala y los probes hablan esto ─────────── */
 
@@ -181,538 +213,6 @@ type Props = {
   onStats: (s: VolateriaStats) => void;
   apiRef?: { current: VolateriaApi | null };
   className?: string;
-};
-
-/* ── shaders del cielo — GLSL ES 3.00 (WebGL2, como la casa) ───── */
-
-const QUAD_VERT = `#version 300 es
-precision highp float;
-out vec2 vUv;
-void main(){
-  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));
-  vUv = p;
-  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);
-}`;
-
-/* EL CIELO DE FERIA — atardecer que envejece a noche con las rondas.
-   uRound 0 = ronda 1 (brasa) → 1 = la noche de los veteranos. */
-const SKY_FRAG = `#version 300 es
-precision highp float;
-in vec2 vUv;
-out vec4 outColor;
-uniform float uTime;
-uniform vec2 uRes;
-uniform float uRound;   // 0 atardecer → 1 noche
-uniform float uFlash;   // fogonazo del disparo
-uniform float uLow;     // 1 = aparato justo (menos capas)
-
-float hash(vec2 p){
-  p = fract(p * vec2(123.34, 456.21));
-  p += dot(p, p + 45.32);
-  return fract(p.x * p.y);
-}
-float noise(vec2 p){
-  vec2 i = floor(p), f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float a = hash(i), b = hash(i + vec2(1.0, 0.0));
-  float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
-  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-float fbm(vec2 p){
-  float v = 0.0, a = 0.5;
-  for (int i = 0; i < 3; i++) { v += a * noise(p); p *= 2.13; a *= 0.5; }
-  return v;
-}
-
-void main(){
-  vec2 uv = vUv;           // 0 = horizonte · 1 = cenit
-  float t = uTime;
-
-  /* base: tinta arriba, brasa baja — la noche se lo come */
-  vec3 cenit = mix(vec3(0.040, 0.034, 0.030), vec3(0.014, 0.013, 0.022), uRound);
-  vec3 base  = mix(vec3(0.105, 0.066, 0.044), vec3(0.048, 0.032, 0.036), uRound);
-  vec3 col = mix(base, cenit, smoothstep(0.08, 0.88, uv.y));
-
-  /* banda de resplandor cobre en el horizonte */
-  float banda = exp(-abs(uv.y - 0.235) * 7.5);
-  col += vec3(0.52, 0.27, 0.11) * banda * (0.52 - 0.36 * uRound);
-
-  /* el sol se hunde — disco suave + halo ancho */
-  vec2 sun = vec2(0.50, 0.225 + uRound * 0.09);
-  float ds = length((uv - sun) * vec2(uRes.x / max(1.0, uRes.y), 1.0));
-  float sol = smoothstep(0.048, 0.026, ds) * 0.85 + exp(-ds * 9.5) * 0.40;
-  col += vec3(0.96, 0.60, 0.28) * sol * (1.0 - 0.78 * uRound);
-
-  /* estrellas — despiertan con la noche */
-  if (uv.y > 0.40 && uLow < 0.5) {
-    vec2 g = floor(uv * uRes / 3.0);
-    float h = hash(g);
-    if (h > 0.9962) {
-      float tw = 0.5 + 0.5 * sin(t * (1.2 + h * 5.0) + h * 47.0);
-      col += vec3(0.92, 0.89, 0.80) * tw
-           * smoothstep(0.40, 0.72, uv.y) * (0.26 + 0.74 * uRound);
-    }
-  }
-
-  /* nubes — dos capas de fbm que derivan con el viento */
-  float velo = smoothstep(0.04, 0.5, uv.y);
-  float c1 = fbm(uv * vec2(2.7, 5.4) + vec2(t * 0.011, 0.0));
-  float m1 = smoothstep(0.52, 0.80, c1) * velo;
-  col = mix(col, vec3(0.30, 0.19, 0.12) * (1.0 - 0.42 * uRound), m1 * 0.50);
-  if (uLow < 0.5) {
-    float c2 = fbm(uv * vec2(1.6, 3.3) + vec2(t * 0.006, 0.0) + 7.3);
-    float m2 = smoothstep(0.58, 0.84, c2) * velo;
-    col = mix(col, vec3(0.185, 0.120, 0.085) * (1.0 - 0.38 * uRound), m2 * 0.42);
-  }
-
-  /* crestas de silueta — dos montañas de perfil */
-  float lejos = 0.185 + sin(uv.x * 4.1 + 1.3) * 0.021 + sin(uv.x * 9.7 + 0.4) * 0.010;
-  float cerca = 0.145 + sin(uv.x * 6.3 + 4.2) * 0.016 + sin(uv.x * 13.1 + 2.1) * 0.008;
-  if (uv.y < cerca)      col = vec3(0.028, 0.022, 0.018) * (1.0 - 0.30 * uRound);
-  else if (uv.y < lejos) col = vec3(0.050, 0.038, 0.029) * (1.0 - 0.30 * uRound);
-
-  /* el fogonazo — la feria respira con cada disparo */
-  col += vec3(1.0, 0.80, 0.55) * uFlash * 0.17;
-
-  outColor = vec4(col, 1.0);
-}`;
-
-/* ── audio — la feria tejida a mano (WebAudio, cero assets) ────── */
-
-/* Reglas sagradas de la casa: nunca suena sin gesto del usuario y
-   nunca lanza errores. Cada ladrillo es una nota con envolvente o
-   una ráfaga de ruido con barrido de filtro. */
-class VolateriaAudio {
-  private ctx: AudioContext | null = null;
-  private master: GainNode | null = null;
-  private ruido: AudioBuffer | null = null;
-  muted = false;
-
-  /* arma el contexto — SIEMPRE dentro de un gesto (COMENZAR/SND) */
-  private arma(): boolean {
-    if (this.ctx) return true;
-    try {
-      const w = window as unknown as {
-        AudioContext?: typeof AudioContext;
-        webkitAudioContext?: typeof AudioContext;
-      };
-      const AC = w.AudioContext ?? w.webkitAudioContext;
-      if (!AC) return false;
-      const ctx = new AC();
-      const master = ctx.createGain();
-      master.gain.value = this.muted ? 0 : 0.6;
-      master.connect(ctx.destination);
-      const len = Math.floor(ctx.sampleRate * 0.5);
-      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-      this.ctx = ctx;
-      this.master = master;
-      this.ruido = buf;
-      return true;
-    } catch {
-      this.ctx = null;
-      return false;
-    }
-  }
-
-  /* SND — toggle. Si enciende, arma dentro del gesto. */
-  snd(): boolean {
-    this.muted = !this.muted;
-    if (!this.muted) this.arma();
-    if (this.ctx && this.master) {
-      try {
-        this.master.gain.setTargetAtTime(
-          this.muted ? 0 : 0.6,
-          this.ctx.currentTime,
-          0.03,
-        );
-      } catch {}
-    }
-    return this.muted;
-  }
-
-  suspend() {
-    try {
-      void this.ctx?.suspend();
-    } catch {}
-  }
-  resume() {
-    try {
-      void this.ctx?.resume();
-    } catch {}
-  }
-  /* V69: cierre limpio — el contexto muere con la sala, sin colgar
-     hilos de audio huérfanos tras un desmontaje */
-  cerrar() {
-    try {
-      void this.ctx?.close();
-    } catch {}
-    this.ctx = null;
-    this.master = null;
-    this.ruido = null;
-  }
-
-  /* gesto — arma el contexto DENTRO del click del usuario (COMENZAR) */
-  gesto() {
-    this.arma();
-    this.resume();
-  }
-
-  /* una nota con envolvente y filtro opcional — el ladrillo base */
-  private nota(
-    tipo: OscillatorType,
-    f0: number,
-    f1: number,
-    dur: number,
-    gan: number,
-    t0 = 0,
-    filtro?: { tipo: BiquadFilterType; freq: number },
-  ) {
-    if (!this.ctx || !this.master || this.muted) return;
-    try {
-      const ctx = this.ctx;
-      const T = ctx.currentTime + t0;
-      const o = ctx.createOscillator();
-      o.type = tipo;
-      o.frequency.setValueAtTime(Math.max(20, f0), T);
-      if (f1 !== f0) {
-        o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), T + dur);
-      }
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, T);
-      g.gain.exponentialRampToValueAtTime(Math.max(0.0002, gan), T + 0.012);
-      g.gain.exponentialRampToValueAtTime(0.0001, T + dur);
-      o.connect(g);
-      let tail: AudioNode = g;
-      if (filtro) {
-        const f = ctx.createBiquadFilter();
-        f.type = filtro.tipo;
-        f.frequency.value = filtro.freq;
-        g.connect(f);
-        tail = f;
-      }
-      tail.connect(this.master);
-      o.start(T);
-      o.stop(T + dur + 0.06);
-    } catch {}
-  }
-
-  /* ráfaga de ruido con barrido — disparos, plumas, golpes */
-  private rafaga(
-    dur: number,
-    gan: number,
-    f0: number,
-    f1: number,
-    t0 = 0,
-    tipo: BiquadFilterType = "bandpass",
-  ) {
-    if (!this.ctx || !this.master || !this.ruido || this.muted) return;
-    try {
-      const ctx = this.ctx;
-      const T = ctx.currentTime + t0;
-      const src = ctx.createBufferSource();
-      src.buffer = this.ruido;
-      src.loop = true;
-      const f = ctx.createBiquadFilter();
-      f.type = tipo;
-      f.Q.value = 0.9;
-      f.frequency.setValueAtTime(Math.max(40, f0), T);
-      f.frequency.exponentialRampToValueAtTime(Math.max(40, f1), T + dur);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(gan, T);
-      g.gain.exponentialRampToValueAtTime(0.0001, T + dur);
-      src.connect(f);
-      f.connect(g);
-      g.connect(this.master);
-      src.start(T);
-      src.stop(T + dur + 0.06);
-    } catch {}
-  }
-
-  /* ── la partitura de la feria ── */
-  disparo() {
-    this.rafaga(0.15, 0.5, 2100, 180);
-    this.nota("sine", 150, 52, 0.12, 0.42);
-  }
-  clic() {
-    this.nota("square", 1900, 1400, 0.03, 0.07);
-  }
-  recarga() {
-    this.nota("square", 1650, 1650, 0.035, 0.08);
-    this.nota("square", 1250, 1250, 0.035, 0.08, 0.12);
-  }
-  quack(suave = false) {
-    const g = suave ? 0.05 : 0.13;
-    this.nota("sawtooth", 255, 160, 0.09, g, 0, {
-      tipo: "lowpass",
-      freq: 1150,
-    });
-    this.nota("sawtooth", 225, 140, 0.08, g * 0.8, 0.1, {
-      tipo: "lowpass",
-      freq: 1050,
-    });
-  }
-  silbido() {
-    this.nota("sine", 1450, 290, 0.72, 0.1);
-  }
-  golpeTierra() {
-    this.nota("sine", 95, 42, 0.14, 0.28);
-    this.rafaga(0.05, 0.09, 520, 120, 0, "lowpass");
-  }
-  plumas() {
-    this.rafaga(0.06, 0.08, 3400, 2100, 0, "highpass");
-  }
-  risa() {
-    this.nota("square", 430, 375, 0.09, 0.08);
-    this.nota("square", 340, 295, 0.09, 0.08, 0.15);
-    this.nota("square", 262, 218, 0.13, 0.08, 0.3);
-  }
-  ronda() {
-    [523, 659, 784, 1047].forEach((f, i) =>
-      this.nota("triangle", f, f, 0.1, 0.11, i * 0.095),
-    );
-  }
-  fin() {
-    [330, 247, 185].forEach((f, i) =>
-      this.nota("triangle", f, f * 0.96, 0.24, 0.11, i * 0.22),
-    );
-  }
-  empieza() {
-    this.nota("triangle", 392, 392, 0.08, 0.09);
-    this.nota("triangle", 587, 587, 0.13, 0.09, 0.1);
-  }
-  /* ── V66: la voz nueva de la feria ── */
-  tinc() {
-    this.nota("square", 1720, 1500, 0.05, 0.09);
-    this.nota("sine", 780, 620, 0.09, 0.12, 0.02);
-  }
-  madera() {
-    this.rafaga(0.09, 0.22, 900, 160, 0, "lowpass");
-    this.nota("triangle", 210, 120, 0.1, 0.2);
-  }
-  maderaS() {
-    this.nota("triangle", 320, 260, 0.12, 0.05);
-    this.nota("triangle", 260, 210, 0.1, 0.045, 0.12);
-  }
-  caw() {
-    this.nota("sawtooth", 640, 300, 0.11, 0.12, 0, {
-      tipo: "bandpass",
-      freq: 1500,
-    });
-    this.nota("sawtooth", 560, 240, 0.13, 0.1, 0.13, {
-      tipo: "bandpass",
-      freq: 1300,
-    });
-  }
-  pop() {
-    this.rafaga(0.07, 0.3, 2600, 700);
-    this.nota("sine", 520, 180, 0.09, 0.16);
-  }
-  poder() {
-    [660, 880, 1320].forEach((f, i) =>
-      this.nota("triangle", f, f, 0.09, 0.1, i * 0.07),
-    );
-  }
-  whoosh() {
-    this.rafaga(0.16, 0.1, 500, 2400, 0, "bandpass");
-  }
-  aviso() {
-    this.nota("sine", 880, 980, 0.06, 0.035);
-  }
-  /* EL PATO REAL baja — rugido grave con doble sierra desafinada */
-  jefe() {
-    this.nota("sawtooth", 58, 40, 1.1, 0.22, 0, {
-      tipo: "lowpass",
-      freq: 320,
-    });
-    this.nota("sawtooth", 63, 44, 1.1, 0.18, 0.02, {
-      tipo: "lowpass",
-      freq: 300,
-    });
-    this.rafaga(0.9, 0.14, 90, 320, 0.05, "lowpass");
-    this.nota("square", 220, 180, 0.14, 0.09, 0.55);
-    this.nota("square", 220, 170, 0.2, 0.09, 0.75);
-  }
-  /* ¡LA CORONA CAE! — fanfarria de cinco pasos + acorde final */
-  corona() {
-    const seq = [392, 494, 587, 784, 988];
-    seq.forEach((f, i) => this.nota("square", f, f, 0.12, 0.12, i * 0.09));
-    this.nota("triangle", 523, 523, 0.5, 0.14, 0.5);
-    this.nota("triangle", 659, 659, 0.5, 0.12, 0.5);
-    this.nota("triangle", 784, 784, 0.55, 0.12, 0.5);
-  }
-  /* VOLADA PERFECTA — arpegio mayor limpio, premio del 8/8 */
-  perfecta() {
-    const seq = [523, 659, 784, 1047];
-    seq.forEach((f, i) => this.nota("triangle", f, f, 0.1, 0.12, i * 0.07));
-    this.nota("triangle", 1319, 1319, 0.3, 0.1, 0.3);
-  }
-}
-
-/* ── la feria: especies, estados y utensilios ──────────────────── */
-
-type TipoPato =
-  | "bronce"
-  | "zafiro"
-  | "dorada"
-  | "humo"
-  | "acorazado"
-  | "real"
-  | "senuelo"
-  | "cuervo";
-type EstadoPato = "vuelo" | "caida" | "suelto" | "fuga";
-type Patron = "onda" | "zigzag" | "pica" | "rasante" | "cruce" | "poste";
-type Poder = "" | "escopeta" | "tiempo";
-type GloboPoder = "escopeta" | "tiempo" | "plomo";
-
-type Especie = {
-  cuerpo0: string;
-  cuerpo1: string;
-  ala: string;
-  alaLejos: string;
-  pico: string;
-  panza: string;
-  ptos: number;
-  vel: number; // multiplicador de velocidad
-  flap: number; // radianes de fase por frame
-  popup: string; // color del popup de puntos
-  hp: number; // impactos que aguanta
-  cebo: boolean; // ¡NO DISPARES!
-};
-
-const ESPECIES: Record<TipoPato, Especie> = {
-  bronce: {
-    cuerpo0: "#a06a3a",
-    cuerpo1: "#5a381d",
-    ala: "#d9a95f",
-    alaLejos: "#77501f",
-    pico: "#d99a4e",
-    panza: "rgba(250,246,236,0.30)",
-    ptos: 100,
-    vel: 1,
-    flap: 0.21,
-    popup: "#e8c793",
-    hp: 1,
-    cebo: false,
-  },
-  zafiro: {
-    cuerpo0: "#3d827a",
-    cuerpo1: "#1d4641",
-    ala: "#74d2c4",
-    alaLejos: "#2b5c55",
-    pico: "#d99a4e",
-    panza: "rgba(234,252,248,0.26)",
-    ptos: 250,
-    vel: 1.3,
-    flap: 0.26,
-    popup: "#8fe6d8",
-    hp: 1,
-    cebo: false,
-  },
-  dorada: {
-    cuerpo0: "#d4ab55",
-    cuerpo1: "#8a6522",
-    ala: "#f6e6b0",
-    alaLejos: "#a8853c",
-    pico: "#e8b060",
-    panza: "rgba(255,250,235,0.42)",
-    ptos: 500,
-    vel: 1.55,
-    flap: 0.3,
-    popup: "#ffe9b0",
-    hp: 1,
-    cebo: false,
-  },
-  humo: {
-    cuerpo0: "#7d7390",
-    cuerpo1: "#3f3852",
-    ala: "#b3a8c9",
-    alaLejos: "#544a6b",
-    pico: "#c9a06a",
-    panza: "rgba(240,236,250,0.22)",
-    ptos: 220,
-    vel: 1.12,
-    flap: 0.24,
-    popup: "#c9bfe6",
-    hp: 1,
-    cebo: false,
-  },
-  acorazado: {
-    cuerpo0: "#8d9099",
-    cuerpo1: "#4a4d55",
-    ala: "#c3c7cf",
-    alaLejos: "#5d6069",
-    pico: "#b8894a",
-    panza: "rgba(240,244,250,0.25)",
-    ptos: 300,
-    vel: 0.8,
-    flap: 0.19,
-    popup: "#d7dbe2",
-    hp: 2,
-    cebo: false,
-  },
-  /* EL PATO REAL — la corona de la feria (V68): cada cuatro rondas
-     baja a exigir tributo. Fases: escolta al 70%, FURIA al 40% */
-  real: {
-    cuerpo0: "#2e6b4f",
-    cuerpo1: "#14382a",
-    ala: "#5fae8a",
-    alaLejos: "#1f4a37",
-    pico: "#e0b45c",
-    panza: "rgba(240,252,244,0.28)",
-    ptos: 1200,
-    vel: 0.55,
-    flap: 0.15,
-    popup: "#ffe9b0",
-    hp: 7,
-    cebo: false,
-  },
-  senuelo: {
-    cuerpo0: "#8a5a2c",
-    cuerpo1: "#5e3a18",
-    ala: "#a97a42",
-    alaLejos: "#6b4420",
-    pico: "#7a4a20",
-    panza: "rgba(250,240,215,0.14)",
-    ptos: 0,
-    vel: 1,
-    flap: 0,
-    popup: "#e0b184",
-    hp: 1,
-    cebo: true,
-  },
-  cuervo: {
-    cuerpo0: "#221f26",
-    cuerpo1: "#0f0e13",
-    ala: "#4a4552",
-    alaLejos: "#1a181f",
-    pico: "#8f8f98",
-    panza: "rgba(220,220,235,0.10)",
-    ptos: 0,
-    vel: 1.7,
-    flap: 0.33,
-    popup: "#b9b3c9",
-    hp: 1,
-    cebo: true,
-  },
-};
-
-/* el sello de cada patrón de vuelo sobre la velocidad base */
-const PATRON_VEL: Record<Patron, number> = {
-  onda: 1,
-  zigzag: 1.12,
-  pica: 1.2,
-  rasante: 1.5,
-  cruce: 1,
-  poste: 1,
-};
-
-/* los globos de poder — colores rgb (chispas) + hex (dibujo) */
-const PODER_COLOR: Record<GloboPoder, [string, string, string]> = {
-  escopeta: ["224,138,82", "#e08a52", "#8a3d20"],
-  tiempo: ["127,212,194", "#7fd4c2", "#2a6e60"],
-  plomo: ["236,200,106", "#ecc86a", "#8f6a1e"],
 };
 
 type Pato = {
@@ -809,23 +309,6 @@ type Junco = {
   espiga: boolean;
 };
 
-const RECORD_KEY = "vp-volateria-record";
-/* la CUOTA PROGRESIVA (V67) — como el Duck Hunt de NES: pasar la
-   ronda exige más puntería cada dos rondas; la 7+ ha de ser perfecta */
-const CUOTAS = [5, 5, 6, 6, 7, 7, 8] as const;
-const quotaOf = (r: number) =>
-  CUOTAS[Math.min(CUOTAS.length - 1, Math.max(0, r - 1))];
-/* velocidad base SIN TECHO (V67): 0.42/ronda hasta la 8, +0.14 para
-   siempre — el veterano nunca encuentra un plano máximo */
-const velocidadRonda = (r: number) =>
-  3.9 + 0.42 * Math.min(Math.max(1, r) - 1, 7) + 0.14 * Math.max(0, r - 8);
-const VOLADA = 8; // patos por ronda
-
-const multOf = (racha: number) => 1 + Math.min(3, Math.floor(racha / 3));
-
-/* EL PATO REAL baja cada cuatro rondas — la cacería de la corona */
-const esJefe = (r: number) => r >= 4 && r % 4 === 0;
-
 function VolateriaEngine({
   onStats,
   apiRef,
@@ -855,6 +338,11 @@ function VolateriaEngine({
     const coarse = window.matchMedia("(pointer: coarse)").matches;
 
     const audio = new VolateriaAudio();
+
+    /* el azar del juego — Math.random en la partida libre; la
+       Volada del Día planta una semilla (V72) y la feria repite */
+    // eslint-disable-next-line prefer-const -- V72 reasigna con la semilla diaria
+    let rng: Rng = Math.random;
 
     /* ── estado del juego — la única fuente de verdad ── */
     let w = 960;
@@ -943,6 +431,12 @@ function VolateriaEngine({
     /* telemetría — UNA sola ruta, mismos campos SIEMPRE (lección V62) */
     const emit = () => {
       if (disposed) return;
+      /* V70: la feria suena a feria — mano caliente y grillos de
+         noche enganchados aquí (idempotentes, con detección de cambio) */
+      audio.setRacha(multOf(racha));
+      audio.setNoche(
+        fase === "listo" ? 0 : Math.min(1, Math.max(0, (ronda - 1) / 8)),
+      );
       onStatsRef.current({
         ok,
         fase,
@@ -1007,41 +501,22 @@ function VolateriaEngine({
       preserveDrawingBuffer: false,
     });
     let prog: WebGLProgram | null = null;
-    const u: Record<string, WebGLUniformLocation | null> = {};
+    let u: Record<string, WebGLUniformLocation | null> = {};
     /* V69: la construcción del cielo vive en una función — el contexto
        GL puede morir (webglcontextlost) y RESUCITAR
        (webglcontextrestored): recompila y re-localiza uniformes */
     const armaGL = (): boolean => {
       if (!gl) return false;
-      const mkShader = (type: number, src: string) => {
-        const sh = gl.createShader(type) as WebGLShader;
-        gl.shaderSource(sh, src);
-        gl.compileShader(sh);
-        if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
-          throw new Error(gl.getShaderInfoLog(sh) ?? "shader");
-        }
-        return sh;
-      };
-      try {
-        prog = gl.createProgram() as WebGLProgram;
-        gl.attachShader(prog, mkShader(gl.VERTEX_SHADER, QUAD_VERT));
-        gl.attachShader(prog, mkShader(gl.FRAGMENT_SHADER, SKY_FRAG));
-        gl.linkProgram(prog);
-        if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-          throw new Error("link cielo");
-        }
-        gl.useProgram(prog);
-        u.time = gl.getUniformLocation(prog, "uTime");
-        u.res = gl.getUniformLocation(prog, "uRes");
-        u.round = gl.getUniformLocation(prog, "uRound");
-        u.flash = gl.getUniformLocation(prog, "uFlash");
-        u.low = gl.getUniformLocation(prog, "uLow");
+      /* V70: la compilación vive en cielo.ts — pura y sin estado */
+      const c = armaCielo(gl);
+      if (c) {
+        prog = c.prog;
+        u = c.u;
         glOk = true;
         return true;
-      } catch {
-        glOk = false;
-        return false;
       }
+      glOk = false;
+      return false;
     };
     if (gl) armaGL();
 
@@ -1120,9 +595,14 @@ function VolateriaEngine({
       bandaBot = Math.round(h * 0.52);
       const pw = Math.round(w * dprNow);
       const ph = Math.round(h * dprNow);
-      if (cvG.width !== pw || cvG.height !== ph) {
-        cvG.width = pw;
-        cvG.height = ph;
+      /* V70: el cielo rinde por debajo — el fbm de las nubes es lo
+         más caro del pipeline y a 0.66 el gradiente no pierde nada
+         visible; el CSS estira y el móvil respira */
+      const pwG = Math.max(2, Math.round(pw * 0.66));
+      const phG = Math.max(2, Math.round(ph * 0.66));
+      if (cvG.width !== pwG || cvG.height !== phG) {
+        cvG.width = pwG;
+        cvG.height = phG;
       }
       if (cvF.width !== pw || cvF.height !== ph) {
         cvF.width = pw;
@@ -1130,7 +610,7 @@ function VolateriaEngine({
       }
       const ctx = cvF.getContext("2d");
       if (ctx) ctx.setTransform(dprNow, 0, 0, dprNow, 0, 0);
-      if (glOk && gl) gl.viewport(0, 0, pw, ph);
+      if (glOk && gl) gl.viewport(0, 0, pwG, phG);
       construyeJuncos();
       if (!glOk) pintaCieloFallback();
     };
@@ -1143,7 +623,7 @@ function VolateriaEngine({
       let sum = 0;
       while (sum < VOLADA) {
         const queda = VOLADA - sum;
-        const roll = Math.random();
+        const roll = rng();
         let s: number;
         if (r === 1) s = p.length < 2 ? 1 : roll < 0.72 ? 1 : 2;
         else if (r === 2) s = roll < 0.4 ? 1 : 2;
@@ -1162,7 +642,7 @@ function VolateriaEngine({
     const spawnDuck = () => {
       const r = Math.max(1, ronda);
       let tipo: TipoPato = "bronce";
-      const roll = Math.random();
+      const roll = rng();
       /* V67: el humo impera en rondas altas (ventana 0.37→0.41) */
       const humoTop = r >= 5 ? 0.41 : 0.37;
       if (r >= 3 && roll < 0.1) tipo = "dorada";
@@ -1171,12 +651,12 @@ function VolateriaEngine({
       else if (roll < 0.24 + 0.03 * Math.min(r, 6)) tipo = "zafiro";
       const E = ESPECIES[tipo];
       /* origen aleatorio: bordes, juncos o cielo */
-      const oR = Math.random();
+      const oR = rng();
       const origen =
         oR < 0.28 ? "izq" : oR < 0.56 ? "der" : oR < 0.79 ? "junco" : "cielo";
       const dir: 1 | -1 =
-        origen === "izq" ? 1 : origen === "der" ? -1 : Math.random() < 0.5 ? 1 : -1;
-      const pR = Math.random();
+        origen === "izq" ? 1 : origen === "der" ? -1 : rng() < 0.5 ? 1 : -1;
+      const pR = rng();
       const patron: Patron =
         origen === "cielo"
           ? pR < 0.62
@@ -1198,21 +678,21 @@ function VolateriaEngine({
       let x: number, y: number, vx: number, vy: number;
       if (origen === "izq") {
         x = -70;
-        y = bandaTop + Math.random() * (bandaBot - bandaTop);
+        y = bandaTop + rng() * (bandaBot - bandaTop);
         vx = dir * speed;
         vy = 0;
       } else if (origen === "der") {
         x = w + 70;
-        y = bandaTop + Math.random() * (bandaBot - bandaTop);
+        y = bandaTop + rng() * (bandaBot - bandaTop);
         vx = dir * speed;
         vy = 0;
       } else if (origen === "junco") {
-        x = w * (0.14 + Math.random() * 0.72);
+        x = w * (0.14 + rng() * 0.72);
         y = grassY - 16;
         vx = dir * speed * 0.55;
         vy = -2.6;
       } else {
-        x = w * (0.1 + Math.random() * 0.8);
+        x = w * (0.1 + rng() * 0.8);
         y = -70;
         vx = dir * speed * 0.6;
         vy = 3.1;
@@ -1234,28 +714,28 @@ function VolateriaEngine({
         ivy: 0,
         dir,
         t: 0,
-        fase0: Math.random() * 6.2832,
-        flap: Math.random() * 6.2832,
+        fase0: rng() * 6.2832,
+        flap: rng() * 6.2832,
         flapRate: E.flap,
         rot: 0,
-        fallDir: Math.random() < 0.5 ? 1 : -1,
+        fallDir: rng() < 0.5 ? 1 : -1,
         bounced: false,
         restT: 0,
         fadeT: 0,
-        targetY: bandaTop + 20 + Math.random() * Math.max(40, bandaBot - bandaTop - 40),
-        retargetT: 60 + Math.random() * 90,
+        targetY: bandaTop + 20 + rng() * Math.max(40, bandaBot - bandaTop - 40),
+        retargetT: 60 + rng() * 90,
         escapeT:
-          Math.max(180, 350 - 16 * (ronda - 1)) + Math.random() * 50,
-        evadeCd: 30 + Math.random() * 40,
+          Math.max(180, 350 - 16 * (ronda - 1)) + rng() * 50,
+        evadeCd: 30 + rng() * 40,
         fintaT: 0,
-        fintaCd: 60 + Math.random() * 60,
+        fintaCd: 60 + rng() * 60,
         senT: 0,
         senBaja: false,
         scale: (coarse ? 1.22 : 1.5) * (tipo === "dorada" ? 0.92 : 1),
         flashT: 0,
       });
       if (idx >= 0 && idx < VOLADA) res[idx] = "vivo";
-      quackT = 120 + Math.random() * 160;
+      quackT = 120 + rng() * 160;
     };
 
     /* el SEÑUELO — madera pintada que sale de los juncos */
@@ -1267,7 +747,7 @@ function VolateriaEngine({
         patron: "poste",
         idx: -1,
         hp: 1,
-        x: w * (0.14 + Math.random() * 0.72),
+        x: w * (0.14 + rng() * 0.72),
         y: grassY - 10,
         vx: 0,
         vy: -1.2,
@@ -1275,7 +755,7 @@ function VolateriaEngine({
         ivy: 0,
         dir: 1,
         t: 0,
-        fase0: Math.random() * 6.2832,
+        fase0: rng() * 6.2832,
         flap: 0,
         flapRate: 0,
         rot: 0,
@@ -1283,7 +763,7 @@ function VolateriaEngine({
         bounced: false,
         restT: 0,
         fadeT: 0,
-        targetY: bandaTop + 30 + Math.random() * Math.max(30, bandaBot - bandaTop - 60),
+        targetY: bandaTop + 30 + rng() * Math.max(30, bandaBot - bandaTop - 60),
         retargetT: 1e9,
         escapeT: 1e9,
         evadeCd: 1e9,
@@ -1299,7 +779,7 @@ function VolateriaEngine({
 
     /* el CUERVO — se cuela entre los patos desde la ronda 2 */
     const spawnCuervo = () => {
-      const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+      const dir: 1 | -1 = rng() < 0.5 ? 1 : -1;
       patos.push({
         tid: ++tid,
         tipo: "cuervo",
@@ -1308,18 +788,18 @@ function VolateriaEngine({
         idx: -1,
         hp: 1,
         x: dir === 1 ? -60 : w + 60,
-        y: bandaTop + Math.random() * (bandaBot - bandaTop),
-        vx: dir * (4.6 + Math.random() * 1.8) * (reduced ? 0.85 : 1),
+        y: bandaTop + rng() * (bandaBot - bandaTop),
+        vx: dir * (4.6 + rng() * 1.8) * (reduced ? 0.85 : 1),
         vy: 0,
         ivx: 0,
         ivy: 0,
         dir,
         t: 0,
-        fase0: Math.random() * 6.2832,
-        flap: Math.random() * 6.2832,
+        fase0: rng() * 6.2832,
+        flap: rng() * 6.2832,
         flapRate: ESPECIES.cuervo.flap,
         rot: 0,
-        fallDir: Math.random() < 0.5 ? 1 : -1,
+        fallDir: rng() < 0.5 ? 1 : -1,
         bounced: false,
         restT: 0,
         fadeT: 0,
@@ -1353,22 +833,22 @@ function VolateriaEngine({
         escolta: false,
         x: w * 0.5,
         y: bandaTop - 60,
-        vx: (Math.random() < 0.5 ? 1 : -1) * velocidadRonda(ronda) * 0.55,
+        vx: (rng() < 0.5 ? 1 : -1) * velocidadRonda(ronda) * 0.55,
         vy: 0,
         ivx: 0,
         ivy: 0,
         dir: 1,
         t: 0,
-        fase0: Math.random() * 6.2832,
-        flap: Math.random() * 6.2832,
+        fase0: rng() * 6.2832,
+        flap: rng() * 6.2832,
         flapRate: ESPECIES.real.flap,
         rot: 0,
-        fallDir: Math.random() < 0.5 ? 1 : -1,
+        fallDir: rng() < 0.5 ? 1 : -1,
         bounced: false,
         restT: 0,
         fadeT: 0,
-        targetY: bandaTop + 60 + Math.random() * Math.max(50, bandaBot - bandaTop - 90),
-        retargetT: 80 + Math.random() * 70,
+        targetY: bandaTop + 60 + rng() * Math.max(50, bandaBot - bandaTop - 90),
+        retargetT: 80 + rng() * 70,
         escapeT: 1150,
         evadeCd: 40,
         fintaT: 0,
@@ -1405,25 +885,25 @@ function VolateriaEngine({
         idx: -1,
         hp: 1,
         x: dir === 1 ? -70 : w + 70,
-        y: bandaTop + Math.random() * (bandaBot - bandaTop),
+        y: bandaTop + rng() * (bandaBot - bandaTop),
         vx: dir * velocidadRonda(ronda) * 1.15,
         vy: 0,
         ivx: 0,
         ivy: 0,
         dir,
         t: 0,
-        fase0: Math.random() * 6.2832,
-        flap: Math.random() * 6.2832,
+        fase0: rng() * 6.2832,
+        flap: rng() * 6.2832,
         flapRate: ESPECIES.zafiro.flap,
         rot: 0,
-        fallDir: Math.random() < 0.5 ? 1 : -1,
+        fallDir: rng() < 0.5 ? 1 : -1,
         bounced: false,
         restT: 0,
         fadeT: 0,
-        targetY: bandaTop + 20 + Math.random() * Math.max(40, bandaBot - bandaTop - 40),
-        retargetT: 34 + Math.random() * 50,
+        targetY: bandaTop + 20 + rng() * Math.max(40, bandaBot - bandaTop - 40),
+        retargetT: 34 + rng() * 50,
         escapeT: 460,
-        evadeCd: 30 + Math.random() * 40,
+        evadeCd: 30 + rng() * 40,
         fintaT: 0,
         fintaCd: 1e9,
         senT: 0,
@@ -1435,16 +915,16 @@ function VolateriaEngine({
 
     /* el GLOBO DE PODER — asciende por la banda esperando plomo */
     const spawnGlobo = () => {
-      const roll = Math.random();
+      const roll = rng();
       const pw: GloboPoder =
         roll < 0.4 ? "escopeta" : roll < 0.8 ? "tiempo" : "plomo";
       const [, c0, c1] = PODER_COLOR[pw];
       globos.push({
-        x: w * (0.1 + Math.random() * 0.8),
+        x: w * (0.1 + rng() * 0.8),
         y: grassY + 6,
-        vy: -(0.5 + Math.random() * 0.18),
+        vy: -(0.5 + rng() * 0.18),
         t: 0,
-        sway: Math.random() * 6.2832,
+        sway: rng() * 6.2832,
         poder: pw,
         c0,
         c1,
@@ -1725,7 +1205,7 @@ function VolateriaEngine({
         recT = 0;
       } else {
         poder = g.poder;
-        poderT = g.poder === "escopeta" ? 380 : 330;
+        poderT = PODER_DURACION[g.poder];
       }
       audio.pop();
       audio.poder();
@@ -2185,14 +1665,14 @@ function VolateriaEngine({
               p.targetY =
                 bandaTop +
                 20 +
-                Math.random() * Math.max(40, bandaBot - bandaTop - 40);
+                rng() * Math.max(40, bandaBot - bandaTop - 40);
               p.retargetT =
                 (p.tipo === "dorada"
                   ? 42
                   : p.patron === "zigzag"
                     ? 34
                     : 70) +
-                Math.random() * 80;
+                rng() * 80;
             }
             /* el impulso de evasión se disipa */
             const dis = Math.pow(0.93, dtD);
@@ -2237,12 +1717,12 @@ function VolateriaEngine({
                   /* V67: la finta se vuelve más probable hasta la ronda 7 */
                   const probFinta =
                     0.045 + 0.012 * Math.min(Math.max(0, ronda - 2), 5);
-                  if (Math.random() < probFinta) {
-                    p.fintaT = 24 + Math.random() * 8;
+                  if (rng() < probFinta) {
+                    p.fintaT = 24 + rng() * 8;
                     p.fintaCd = Math.max(
                       110,
                       150 - 8 * Math.max(0, ronda - 2),
-                    ) + Math.random() * 90;
+                    ) + rng() * 90;
                     audio.whoosh();
                   } else {
                     p.fintaCd = 12;
@@ -2291,14 +1771,14 @@ function VolateriaEngine({
                     : ronda >= 2
                       ? 0.028 + 0.006 * Math.min(ronda - 2, 6)
                       : 0) * (reduced ? 0.4 : 1);
-                if (probEva > 0 && Math.random() < probEva) {
+                if (probEva > 0 && rng() < probEva) {
                   const d = Math.sqrt(Math.max(1, d2));
                   const imp = p.tipo === "real" ? 4.6 : 3.2;
                   p.ivx += (dx / d) * imp;
                   p.ivy += (dy / d) * imp;
                   p.evadeCd = p.tipo === "real" && p.enfada
                     ? 22
-                    : 46 + Math.random() * 40;
+                    : 46 + rng() * 40;
                 } else {
                   p.evadeCd = 12;
                 }

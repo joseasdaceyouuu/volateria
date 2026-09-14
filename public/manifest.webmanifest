@@ -1,0 +1,40 @@
+{
+  "name": "VOLATERÍA — el tiro al pato de feria",
+  "short_name": "VOLATERÍA",
+  "description": "El tiro al pato de feria, reimaginado — oleadas veloces, señuelos traidores, globos de poder y EL PATO REAL.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#0a0908",
+  "theme_color": "#0a0908",
+  "lang": "es",
+  "categories": ["games"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512-maskable.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ]
+}
