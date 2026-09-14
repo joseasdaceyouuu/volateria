@@ -25,6 +25,10 @@ como proyecto independiente.
 - **Telegráfo de fuga** — destello + tick 45 frames antes de que un pato
   escape: la escalada es difícil pero justa.
 - **El zorro** — sube con la presa… o se ríe de tus fallos.
+- **Pausa de feria** — ESC o P contienen el mundo y el audio; el chip
+  de pausa (arriba a la derecha) también sirve en táctil.
+- **Recarga automática en táctil** — sin tecla R en el bolsillo, el
+  cargador se repone solo.
 
 ## Oficio
 
@@ -34,6 +38,24 @@ como proyecto independiente.
 - `prefers-reduced-motion` respetado, táctil soportado (tap para disparar).
 - Telemetría de QA en `window.__labD05Dbg` (objeto plano, forma estable) +
   sonda Playwright en `scripts/probe.mjs`.
+
+## Novedades v1.1 — auditoría V69
+
+- **Pausa real** — ESC/P o el botón detienen el mundo Y el audio
+  (`AudioContext.suspend`), con cartel propio: ronda, puntos y REANUDAR.
+- **El cielo resucita** — `webglcontextrestored` recompila el shader y
+  re-localiza uniformes: antes un context-lost dejaba el atardecer en
+  fallback estático para siempre.
+- **Audio sin huérfanos** — el `AudioContext` se cierra al desmontar.
+- **Teclado cortés** — los atajos con Cmd/Ctrl/Alt son del sistema; la
+  feria no los toca.
+- **Táctil sin atascos** — cargador que se repone solo en punteros
+  `coarse`.
+- **Motor memoizado** — la sala re-renderiza a ~10 Hz con los stats; el
+  motor (refs/props estables) deja de seguirle el paso (`React.memo`).
+- **Accesibilidad** — escenario con `role="application"` + etiqueta,
+  y jerarquía de títulos en los carteles (h1/h2).
+- **Sonda QA ampliada** — paso 4b: ESC congela la presa y P reanuda.
 
 ## Stack
 
@@ -56,3 +78,4 @@ bun run probe      # sonda QA (requiere servidor en :3000 o BASE=…)
 | Clic / tap | Disparar |
 | `R` | Recargar |
 | `M` | Silencio |
+| `ESC` / `P` | Pausar / reanudar |

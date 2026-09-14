@@ -7,6 +7,7 @@
    3. CONTRATO DEL PUNTERO: mouse a coords conocidas ⇒ px/py en px CSS
       exactos (tolerancia 2).
    4. DISPARO AL AIRE: balas 3→2, tiros=1, racha intacta.
+  4b. PAUSA (V69): ESC detiene el mundo (presa congelada), P reanuda.
    5. CAZA REAL: se lee la posición de un pato REAL (cebo excluido),
       se le dispara ENCIMA → hits=1, puntos>0, racha=1, viva=false.
    6. RESOLUCIÓN: resultados[0]=acierto cuando toca el campo y el
@@ -119,6 +120,32 @@ const s3 = await page.evaluate(() => {
 });
 check("tiro — al aire gasta balas (3→2) y cuenta el disparo", s3.balas === 2 && s3.tiros === 1 && s3.racha === 0, `balas=${s3.balas} tiros=${s3.tiros}`);
 await page.screenshot({ path: `${OUT}02-jugando.png` });
+
+/* ── 4b · PAUSA (V69) — ESC contiene el mundo, P lo reanuda ──── */
+await page.keyboard.press("Escape");
+await sleep(400);
+const pz1 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  const p = (d.patos ?? []).find((q) => q.viva && !q.cebo);
+  return { pausa: d.pausa ?? null, x: p ? p.x : null, y: p ? p.y : null };
+});
+await sleep(800);
+const pz2 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  const p = (d.patos ?? []).find((q) => q.viva && !q.cebo);
+  return { x: p ? p.x : null, y: p ? p.y : null };
+});
+check("pausa — ESC activa la pausa (V69)", pz1.pausa === true, `pausa=${pz1.pausa}`);
+check(
+  "pausa — el mundo congelado (la presa no vuela)",
+  pz1.x === null || (pz1.x === pz2.x && pz1.y === pz2.y),
+  pz1.x === null ? "sin presa viva" : `dx=${Math.abs(pz2.x - pz1.x).toFixed(4)}`,
+);
+await page.keyboard.press("p");
+await sleep(400);
+const pz3 = await page.evaluate(() => (window.__labD05Dbg ?? {}).pausa ?? null);
+check("pausa — P reanuda la feria", pz3 === false, `pausa=${pz3}`);
+await page.screenshot({ path: `${OUT}02b-pausa.png` });
 
 /* ── 5 · CAZA REAL — se sigue al pato REAL y se le dispara encima ── */
 const fresco = await hasta(

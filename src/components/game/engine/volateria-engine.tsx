@@ -106,9 +106,16 @@
    nunca suena sin permiso del usuario, nunca lanza errores. Disparo
    = ráfaga de ruido con barrido + golpe grave; quack, silbido de
    caída, risa del zorro, golpecito de madera, graznido y jingle de
-   poder tejidos a mano. */
+   poder tejidos a mano.
 
-import { useEffect, useRef } from "react";
+   V69 — AUDITORÍA: PAUSA real (ESC/P/botón — el mundo Y el audio se
+   detienen), recarga automática en táctil (no hay tecla R en el
+   bolsillo), el cielo RESUCITA tras webglcontextrestored (antes
+   quedaba en fallback para siempre), cierre limpio del AudioContext
+   al desmontar y teclado que respeta los atajos del sistema
+   (Cmd/Ctrl/Alt). */
+
+import { memo, useEffect, useRef } from "react";
 import { drawGlow, glowSprite } from "../lab-fx";
 
 /* ── tipos públicos — la sala y los probes hablan esto ─────────── */
@@ -137,6 +144,7 @@ export type VolateriaStats = {
   mult: number;
   balas: number;
   recargando: boolean;
+  pausa: boolean; // V69: el mundo detenido por la sala
   hits: number;
   escapes: number;
   tiros: number;
@@ -163,6 +171,7 @@ export type VolateriaApi = {
   puntero: (cx: number, cy: number) => void;
   disparo: (cx: number, cy: number) => void;
   recargar: () => void;
+  pausa: () => void;
   empezar: () => void;
   snd: () => void;
   leave: () => void;
@@ -332,6 +341,16 @@ class VolateriaAudio {
     try {
       void this.ctx?.resume();
     } catch {}
+  }
+  /* V69: cierre limpio — el contexto muere con la sala, sin colgar
+     hilos de audio huérfanos tras un desmontaje */
+  cerrar() {
+    try {
+      void this.ctx?.close();
+    } catch {}
+    this.ctx = null;
+    this.master = null;
+    this.ruido = null;
   }
 
   /* gesto — arma el contexto DENTRO del click del usuario (COMENZAR) */
@@ -807,7 +826,7 @@ const multOf = (racha: number) => 1 + Math.min(3, Math.floor(racha / 3));
 /* EL PATO REAL baja cada cuatro rondas — la cacería de la corona */
 const esJefe = (r: number) => r >= 4 && r % 4 === 0;
 
-export default function VolateriaEngine({
+function VolateriaEngine({
   onStats,
   apiRef,
   className,
@@ -887,6 +906,7 @@ export default function VolateriaEngine({
     const zorro: Zorro = { estado: "oculto", t: 0, hold: false, risa: false, x: 0.5 };
 
     let freezeT = 0; // hitstop
+    let pausado = false; // V69: la sala puede contener el mundo
     let shakeA = 0;
     let flash = 0;
     let kick = 0;
@@ -934,6 +954,7 @@ export default function VolateriaEngine({
         mult: multOf(racha),
         balas,
         recargando: recT > 0,
+        pausa: pausado,
         hits,
         escapes,
         tiros,
@@ -987,7 +1008,11 @@ export default function VolateriaEngine({
     });
     let prog: WebGLProgram | null = null;
     const u: Record<string, WebGLUniformLocation | null> = {};
-    if (gl) {
+    /* V69: la construcción del cielo vive en una función — el contexto
+       GL puede morir (webglcontextlost) y RESUCITAR
+       (webglcontextrestored): recompila y re-localiza uniformes */
+    const armaGL = (): boolean => {
+      if (!gl) return false;
       const mkShader = (type: number, src: string) => {
         const sh = gl.createShader(type) as WebGLShader;
         gl.shaderSource(sh, src);
@@ -1012,10 +1037,13 @@ export default function VolateriaEngine({
         u.flash = gl.getUniformLocation(prog, "uFlash");
         u.low = gl.getUniformLocation(prog, "uLow");
         glOk = true;
+        return true;
       } catch {
         glOk = false;
+        return false;
       }
-    }
+    };
+    if (gl) armaGL();
 
     /* respaldo sin GL: atardecer estático pre-pintado */
     const fbSky = document.createElement("canvas");
@@ -1704,7 +1732,7 @@ export default function VolateriaEngine({
     };
 
     const disparo = (cx: number, cy: number) => {
-      if (fase !== "jugando") return;
+      if (fase !== "jugando" || pausado) return;
       puntero.x = cx;
       puntero.y = cy;
       puntero.inside = true;
@@ -1824,9 +1852,21 @@ export default function VolateriaEngine({
     };
 
     const recargar = () => {
-      if (fase !== "jugando" || balas >= cargador || recT > 0) return;
+      if (fase !== "jugando" || pausado || balas >= cargador || recT > 0)
+        return;
       recT = 27;
       audio.recarga();
+      emit();
+    };
+
+    /* V69: la PAUSA de la sala — el mundo contiene el aliento, el
+       audio se duerme, y ni spawnT ni fugas avanzan mientras tanto.
+       La sala manda (ESC/P/botón); el motor obedece. */
+    const togglePausa = () => {
+      if (fase !== "jugando") return;
+      pausado = !pausado;
+      if (pausado) audio.suspend();
+      else audio.resume();
       emit();
     };
 
@@ -1995,6 +2035,8 @@ export default function VolateriaEngine({
           emit();
         }
       }
+      /* V69: en táctil no hay tecla R — el cargador se repone solo */
+      if (coarse && balas <= 0 && recT <= 0) recargar();
 
       /* el poder activo se gasta */
       if (poderT > 0) {
@@ -3163,7 +3205,7 @@ export default function VolateriaEngine({
       const dt = Math.min(2, Math.max(0.5, msFrame / 16.667));
       tGlobal += dt / 60;
 
-      if (fase === "jugando") {
+      if (fase === "jugando" && !pausado) {
         if (freezeT > 0) {
           freezeT -= dt; /* hitstop — el mundo contiene el aliento */
         } else {
@@ -3202,6 +3244,7 @@ export default function VolateriaEngine({
         },
         disparo,
         recargar,
+        pausa: togglePausa,
         empezar,
         snd: () => {
           audio.snd();
@@ -3213,13 +3256,21 @@ export default function VolateriaEngine({
       };
     }
 
-    /* teclado del juego — R recarga, M silencio (ESC lo pone LabFrame) */
+    /* teclado del juego — R recarga, M silencio, ESC/P pausa (V69:
+       la pausa vive aquí — y los atajos con Cmd/Ctrl/Alt son del
+       sistema, la feria no los toca) */
     const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === "r" || e.key === "R") {
         recargar();
       } else if ((e.key === "m" || e.key === "M") && !e.repeat) {
         audio.snd();
         emit();
+      } else if (
+        (e.key === "Escape" || e.key === "p" || e.key === "P") &&
+        !e.repeat
+      ) {
+        togglePausa();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -3244,8 +3295,17 @@ export default function VolateriaEngine({
       pintaCieloFallback();
       emit();
     };
+    /* V69: el cielo resucita — antes el GL quedaba muerto para siempre */
+    const onRestored = () => {
+      if (armaGL()) {
+        gl?.viewport(0, 0, cvG.width, cvG.height);
+        ok = true;
+        emit();
+      }
+    };
     document.addEventListener("visibilitychange", onVis);
     cvG.addEventListener("webglcontextlost", onLost);
+    cvG.addEventListener("webglcontextrestored", onRestored);
 
     resize();
     ok = true;
@@ -3259,6 +3319,8 @@ export default function VolateriaEngine({
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("visibilitychange", onVis);
       cvG.removeEventListener("webglcontextlost", onLost);
+      cvG.removeEventListener("webglcontextrestored", onRestored);
+      audio.cerrar(); // V69: sin hilos de audio huérfanos
       if (apiRef) apiRef.current = null;
       if (gl && prog) gl.deleteProgram(prog);
     };
@@ -3281,3 +3343,7 @@ export default function VolateriaEngine({
     </div>
   );
 }
+
+/* V69: memo — la sala re-renderiza a ~10 Hz con los stats, pero el
+   motor (refs y props estables) no tiene por qué seguirle el paso */
+export default memo(VolateriaEngine);

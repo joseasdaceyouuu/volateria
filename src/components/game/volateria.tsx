@@ -13,6 +13,8 @@
      DENTRO del gesto (regla de la casa) y SoundBtn queda a mano
    - overlay FIN: fin de la feria — puntos, ronda alcanzada, récord
      (localStorage del visitante) y REINTENTAR
+   - overlay PAUSA (V69): ESC/P o el botón contienen el mundo —
+     Reanudar sin perder ronda, puntos ni racha
    - el puntero MANDA: mover apunta, el clic DISPARA (el motor resuelve
      el hit síncronamente); touch = tap para disparar
    - cursor:native oculto mientras se juega — la mira dibujada ES el
@@ -39,6 +41,7 @@ const FASE_INICIAL: VolateriaStats = {
   mult: 1,
   balas: 3,
   recargando: false,
+  pausa: false,
   hits: 0,
   escapes: 0,
   tiros: 0,
@@ -91,6 +94,7 @@ export default function Volateria() {
       mult: stats.mult,
       balas: stats.balas,
       recargando: stats.recargando,
+      pausa: stats.pausa,
       hits: stats.hits,
       escapes: stats.escapes,
       tiros: stats.tiros,
@@ -128,6 +132,7 @@ export default function Volateria() {
   }, []);
 
   const jugando = stats.fase === "jugando";
+  const enPausa = jugando && stats.pausa;
   /* entrada escalonada de los carteles (una sola vez, tras el boot) */
   const entra = (delay: string) =>
     `transition-all duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${delay} ${
@@ -139,8 +144,10 @@ export default function Volateria() {
   return (
     <GameFrame>
       <div
+        role="application"
+        aria-label="Escenario de VOLATERÍA: apunta con el cursor y dispara a los patos"
         className={`absolute inset-0 select-none touch-none ${
-          jugando ? "cursor-none" : ""
+          jugando && !enPausa ? "cursor-none" : ""
         }`}
         onPointerMove={onPointerMove}
         onPointerDown={onPointerDown}
@@ -368,7 +375,52 @@ export default function Volateria() {
               <p
                 className={`mt-6 font-mono text-[9px] uppercase tracking-[0.25em] text-faint/70 ${entra("[transition-delay:640ms]")}`}
               >
-                también: M silencio · la mira vive en tu cursor
+                también: M silencio · ESC pausa · la mira vive en tu cursor
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── cartel PAUSA — el mundo contiene el aliento (V69) ── */}
+        {enPausa && (
+          <div
+            data-volateria-ui
+            className="absolute inset-0 z-[94] grid place-items-center bg-[#0a0908]/60 backdrop-blur-[3px]"
+          >
+            <div className="mx-6 text-center">
+              <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-cream/70">
+                la feria espera
+              </p>
+              <h2 className="mt-4 font-sans text-5xl font-semibold leading-[0.92] tracking-tight md:text-7xl">
+                <span className="bg-[linear-gradient(180deg,#faf6ec_0%,#f0e9d8_52%,#d6c8a8_100%)] bg-clip-text text-transparent">
+                  PAUSA
+                </span>
+              </h2>
+              <p className="mt-3 font-serif text-lg italic text-cream/75">
+                ronda {stats.ronda} · {stats.puntos} puntos — el zorro
+                también descansa
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => apiRef.current?.pausa()}
+                  className="group inline-flex items-center gap-3 rounded-full border border-copper/70 bg-copper/10 px-8 py-3.5 font-mono text-[11px] uppercase tracking-[0.3em] text-copper transition-colors duration-300 hover:bg-copper/20"
+                >
+                  Reanudar
+                  <span
+                    aria-hidden
+                    className="transition-transform duration-300 group-hover:translate-x-1"
+                  >
+                    →
+                  </span>
+                </button>
+                <SoundBtn
+                  on={!stats.muted}
+                  onToggle={() => apiRef.current?.snd()}
+                />
+              </div>
+              <p className="mt-5 font-mono text-[9px] uppercase tracking-[0.25em] text-faint/70">
+                ESC o P también reanudan
               </p>
             </div>
           </div>
@@ -381,9 +433,9 @@ export default function Volateria() {
             className="absolute inset-0 z-[94] grid place-items-center bg-[#0a0908]/50 backdrop-blur-[3px]"
           >
             <div className="mx-6 max-w-xl text-center">
-              <p className="font-mono text-[10px] uppercase tracking-[0.34em] text-copper">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.34em] text-copper">
                 Fin de la feria
-              </p>
+              </h2>
               <p className="mt-6 font-mono text-6xl font-semibold tabular-nums text-cream md:text-7xl">
                 {stats.puntos}
               </p>
@@ -417,6 +469,26 @@ export default function Volateria() {
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {/* botón de PAUSA a mano mientras se juega — táctil incluido (V69) */}
+        {jugando && !enPausa && (
+          <div
+            data-volateria-ui
+            className="absolute right-6 top-4 z-[95]"
+          >
+            <button
+              type="button"
+              onClick={() => apiRef.current?.pausa()}
+              aria-label="Pausar la partida"
+              className="rounded-full border border-line bg-ink/60 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke backdrop-blur-sm transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+            >
+              <span aria-hidden className="mr-2 inline-block">
+                ○
+              </span>
+              Pausa
+            </button>
           </div>
         )}
 
