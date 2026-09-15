@@ -2,10 +2,11 @@
 
 > El tiro al pato de feria, reimaginado: atardecer de lona, zorro cómplice y un cargador que nunca sobra.
 
-## En escena (v1.4.0)
+## En escena (v1.5.0)
 
 Lo que ya luces bajo las bombillas de la feria:
 
+- **La primera vez (V77)** — la guía susurra tres consejos en la ronda 1 de la primera visita (mira, engaños, recarga) y se despide para siempre al cerrar la tarde; la CADENA DE PERFECTAS multiplica la hazaña seguida (×2 y ×3).
 - **La escalada (V76)** — rango de maestría por modo (APRENDIZ→LEYENDA) en el archivo y en el fin, el podio local con las cinco mejores tardes de cada modo (la diaria marca ☀), y el bestiario cuenta rebotes del espejo y bandas íntegras.
 - **La feria calibrada (V75)** — Volada del Día planetaria de verdad: semilla UTC, modo FERIA fijo, un solo sello por día (el primero manda) y CONTINUAR restaura la semilla exacta de la tarde.
 - **Puerta de vuelta** — botón CARTEL en pausa y fin: ajustes, archivo y continuar sin recargar.

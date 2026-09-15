@@ -447,6 +447,7 @@ function VolateriaEngine({
     let premiosRun = 0;
     let rebotesRun = 0; // V76: plomo que el espejo devolvió
     let bandasRun = 0; // V76: formaciones completas caídas por el guía
+    let perfectasSeguidas = 0; // V77: la cadena de perfectas
     const porEspecie: Record<string, number> = {};
 
     /* poder activo y sus trampas */
@@ -1882,7 +1883,12 @@ function VolateriaEngine({
           !esJefe(ronda) &&
           res.length === VOLADA &&
           res.every((x) => x === "acierto");
-        const premio = perfecta ? 200 * ronda : 0;
+        /* V77: la CADENA DE PERFECTAS — repetir la hazaña en rondas
+           seguidas multiplica el premio (×2 y ×3, techo en ×3) */
+        if (perfecta) perfectasSeguidas++;
+        else perfectasSeguidas = 0;
+        const multPerfecta = perfecta ? Math.min(3, perfectasSeguidas) : 1;
+        const premio = perfecta ? 200 * ronda * multPerfecta : 0;
         if (premio > 0) {
           puntos += premio;
           perfectasRun++;
@@ -1920,7 +1926,9 @@ function VolateriaEngine({
                 ? "tres coronas, una furia"
                 : "derriba la corona"
               : (premio > 0
-                  ? `volada perfecta +${premio} · `
+                  ? `volada perfecta${
+                      multPerfecta > 1 ? ` ×${multPerfecta}` : ""
+                    } +${premio} · `
                   : "") +
                 (subs[ronda] ??
                   (ronda > 10
@@ -2003,6 +2011,7 @@ function VolateriaEngine({
       premiosRun = 0;
       rebotesRun = 0;
       bandasRun = 0;
+      perfectasSeguidas = 0;
       for (const k of Object.keys(porEspecie)) delete porEspecie[k];
       if (c && (c.v === 1 || c.v === 2) && MODOS[c.modo]) {
         modo = diaria ? MODOS.feria : MODOS[c.modo];

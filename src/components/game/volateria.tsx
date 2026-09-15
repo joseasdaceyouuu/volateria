@@ -155,6 +155,14 @@ export default function Volateria() {
   );
   const [toast, setToast] = useState<{ txt: string; sub: string } | null>(null);
   const [shareTxt, setShareTxt] = useState("");
+  /* V77: la guía de la primera vez — solo visita quien nunca pasó de ronda 1 */
+  const [guiaActiva] = useState(() => {
+    try {
+      return localStorage.getItem("vp-guia") !== "1";
+    } catch {
+      return false;
+    }
+  });
   /* V73: el panel del cazador — flash, temblor, mira, asistencia */
   const [ajustes, setAjustes] = useState<Ajustes>(() => leeAjustes());
   const [ajustesAbierto, setAjustesAbierto] = useState(false);
@@ -201,6 +209,10 @@ export default function Volateria() {
       });
     }
     if (stats.diaria) sellaDiario(stats);
+    /* V77: la guía se despide para siempre en la primera tarde cerrada */
+    try {
+      localStorage.setItem("vp-guia", "1");
+    } catch {}
   }, [stats.fase, stats]);
 
   /* el toast se despide solo */
@@ -661,6 +673,21 @@ export default function Volateria() {
                 también: M silencio · ESC pausa · la mira vive en tu cursor
               </p>
             </div>
+          </div>
+        )}
+
+        {/* V77: la guía de la primera vez — susurros de la ronda 1 */}
+        {guiaActiva && jugando && !enPausa && stats.ronda === 1 && (
+          <div
+            data-volateria-ui
+            aria-live="polite"
+            className="pointer-events-none absolute bottom-28 left-1/2 z-[93] max-w-[86vw] -translate-x-1/2 rounded-full border border-line/70 bg-ink/70 px-5 py-2 text-center font-mono text-[9px] uppercase tracking-[0.22em] text-smoke backdrop-blur-sm md:bottom-24"
+          >
+            {stats.hits >= 1
+              ? "R recarga · llena la cuota y la ronda crece"
+              : stats.tiros >= 1
+                ? "cuidado: hay señuelos y cuervos que cobran plomo"
+                : "la mira vive en tu cursor — apunta y dispara"}
           </div>
         )}
 

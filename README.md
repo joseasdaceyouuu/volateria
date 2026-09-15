@@ -10,7 +10,7 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.4.0)
+## La feria (v1.5.0)
 
 - **La escalada (V76)** — rango de maestría por modo (APRENDIZ → LEYENDA) en
   el archivo y en el fin; el podio local: las cinco mejores tardes de cada
