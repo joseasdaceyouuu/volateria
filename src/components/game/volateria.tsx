@@ -111,6 +111,11 @@ const FASE_INICIAL: VolateriaStats = {
   bandas: 0,
   replay: false,
   grabando: false,
+  lastrados: 0,
+  galletas: 0,
+  galleta: false,
+  apagon: false,
+  plancha: false,
   porEspecie: {},
   patos: [],
 };
@@ -305,6 +310,11 @@ export default function Volateria() {
       bandas: stats.bandas,
       replay: stats.replay,
       grabando: stats.grabando,
+      lastrados: stats.lastrados,
+      galletas: stats.galletas,
+      galleta: stats.galleta,
+      apagon: stats.apagon,
+      plancha: stats.plancha,
       porEspecie: stats.porEspecie,
       patos: stats.patos,
     };
@@ -494,6 +504,17 @@ export default function Volateria() {
                 </span>
               </div>
             )}
+            {/* V79: la galleta de la suerte — chip rosa junto al cañón */}
+            {stats.galleta && (
+              <div className="mt-3 flex items-center gap-2">
+                <span
+                  aria-label="Galleta de la suerte activa: el próximo disparo en vacío no rompe la racha"
+                  className="font-mono text-[10px] uppercase tracking-[0.25em] text-[#ef9fae]"
+                >
+                  ✿ galleta de la suerte
+                </span>
+              </div>
+            )}
           </div>
 
           {/* hint táctil — sobre la línea del pie del marco */}
@@ -502,13 +523,14 @@ export default function Volateria() {
           </p>
         </div>
 
-        {/* ── cartel LISTO — la entrada de la feria ── */}
+        {/* ── cartel LISTO — la entrada de la feria (V79: SCROLL en
+           pantallas bajas — nada pisa ya la firma en móvil) ── */}
         {stats.fase === "listo" && (
           <div
             data-volateria-ui
-            className="absolute inset-0 z-[94] grid place-items-center bg-[#0a0908]/55 backdrop-blur-[3px]"
+            className="absolute inset-0 z-[94] overflow-y-auto overscroll-contain bg-[#0a0908]/55 backdrop-blur-[3px]"
           >
-            <div className="mx-6 max-w-2xl text-center">
+            <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col items-center justify-center px-6 py-10 text-center">
               <p
                 className={`flex items-center justify-center gap-3 font-mono text-[10px] uppercase tracking-[0.34em] text-cream/70 ${entra("[transition-delay:60ms]")}`}
               >
@@ -538,7 +560,7 @@ export default function Volateria() {
               </p>
 
               <div
-                className={`mt-9 grid grid-cols-1 gap-3 text-left sm:grid-cols-3 ${entra("[transition-delay:420ms]")}`}
+                className={`mt-7 grid grid-cols-1 gap-3 text-left sm:mt-9 sm:grid-cols-3 ${entra("[transition-delay:420ms]")}`}
               >
                 {[
                   {
@@ -569,7 +591,7 @@ export default function Volateria() {
               </div>
 
               <div
-                className={`mt-9 flex flex-col items-center gap-4 ${entra("[transition-delay:540ms]")}`}
+                className={`mt-7 flex flex-col items-center gap-3.5 sm:mt-9 sm:gap-4 ${entra("[transition-delay:540ms]")}`}
               >
                 {/* V71: los tres modos de la feria — cada uno su récord */}
                 <div
@@ -697,10 +719,8 @@ export default function Volateria() {
                     Ajustes
                   </button>
                 </div>
-                <SoundBtn
-                  on={!stats.muted}
-                  onToggle={() => apiRef.current?.snd()}
-                />
+                {/* V79: el SONIDO del cartel vive SOLO en la esquina —
+                   había dos y el doble manda ruido (auditoría de diseño) */}
               </div>
               {/* V72: la medallera — los trofeos de la casa */}
               <div
@@ -814,6 +834,16 @@ export default function Volateria() {
                 >
                   <span aria-hidden>⌂</span>
                   Cartel
+                </button>
+                {/* V79: AJUSTES también en la pausa — auditar diseño
+                   halló el panel inalcanzable sin soltar la tarde */}
+                <button
+                  type="button"
+                  onClick={() => setAjustesAbierto(true)}
+                  className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-6 py-3 font-mono text-[10px] uppercase tracking-[0.25em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                >
+                  <span aria-hidden>⚙</span>
+                  Ajustes
                 </button>
                 <SoundBtn
                   on={!stats.muted}
@@ -1032,6 +1062,8 @@ export default function Volateria() {
                     ["premios", String(archivo.premios)],
                     ["rebotes espejo", String(archivo.rebotes)],
                     ["bandas íntegras", String(archivo.bandas)],
+                    ["lastrados", String(archivo.lastrados)],
+                    ["galletas", String(archivo.galletas)],
                   ].map(([k, v]) => (
                     <div key={k} className="border border-line/60 bg-[#0d0c0a] px-3 py-2.5">
                       <p className="font-mono text-[8px] uppercase tracking-[0.22em] text-faint">

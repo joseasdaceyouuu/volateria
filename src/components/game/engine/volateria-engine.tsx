@@ -138,6 +138,7 @@ import {
   LETRAS_PREMIO,
   cuotaModo,
   tipoDeJefe,
+  TRAMPA,
 } from "./config";
 import {
   RUN_KEY,
@@ -170,6 +171,8 @@ export type PatoTelemetria = {
   viva: boolean; // ¿aún vuela?
   tipo: string; // bronce · zafiro · dorada · humo · acorazado · senuelo · cuervo
   cebo: boolean; // ¡NO DISPARES! señuelo o cuervo
+  lastrado?: boolean; // V79: lleva plomo falso — pide DOS toques
+  est?: string; // V79: vuelo · caida · suelto · fuga (QA del teatro)
 };
 
 export type GloboTelemetria = { x: number; y: number; poder: string };
@@ -218,6 +221,11 @@ export type VolateriaStats = {
   bandas: number; // V76: bandas silvestres completas en la run
   replay: boolean; // V78: la feria se está reviviendo (sin input, sin honores)
   grabando: boolean; // V78: esta tarde deja fantasma (diaria fresca)
+  lastrados: number; // V79: lastrados reventados del todo en la run
+  galletas: number; // V79: fallos en vacío que la galleta perdonó
+  galleta: boolean; // V79: ¿llevas la galleta de la suerte puesta?
+  apagon: boolean; // V79: LA LÁMPARA QUE SIFA está (o llega) en escena
+  plancha: boolean; // V79: LA PLANCHA APRIETA (cierre de cuota veloz)
   porEspecie: Record<string, number>; // cazados por especie (V72)
   patos: PatoTelemetria[];
 };
@@ -301,6 +309,9 @@ type Pato = {
   guia?: boolean; // guía de la banda silvestre
   lid?: number; // id de la formación
   dyForm?: number; // hueco en la formación
+  /* V79: LA FERIA TRUCADA */
+  lastrado?: boolean; // lleva plomo falso: se finge muerto al primer toque
+  teatro?: boolean; // en caída teatral — RESURGE a mitad de vuelo
 };
 
 type Pluma = {
@@ -466,6 +477,13 @@ function VolateriaEngine({
     let rebotesRun = 0; // V76: plomo que el espejo devolvió
     let bandasRun = 0; // V76: formaciones completas caídas por el guía
     let perfectasSeguidas = 0; // V77: la cadena de perfectas
+    /* V79: LA FERIA TRUCADA — trampas de la casa y engalos del cazador */
+    let lastradosRun = 0; // lastrados reventados del todo
+    let galletasRun = 0; // fallos en vacío que la galleta perdonó
+    let galleta = false; // la galleta de la suerte puesta
+    let plancha = false; // LA PLANCHA APRIETA — cierre de cuota veloz
+    let apagonProg = 0; // frames hasta el aviso del apagón
+    let apagonT = 0; // reloj del apagón (aviso → pleno → retorno)
     /* V78: EL FANTASMA — reloj de la tarde, grabación y replay */
     let tRun = 0; // segundos de mundo vivos (sin pausas ni carteles)
     let grabando = false; // esta diaria deja fantasma
@@ -565,6 +583,11 @@ function VolateriaEngine({
         bandas: bandasRun,
         replay: replayActivo,
         grabando,
+        lastrados: lastradosRun,
+        galletas: galletasRun,
+        galleta,
+        apagon: apagonT > 0,
+        plancha,
         porEspecie: { ...porEspecie },
         enCola: Math.max(0, VOLADA - lanzados),
         resultados: res.slice(),
@@ -591,6 +614,8 @@ function VolateriaEngine({
           viva: p.estado === "vuelo",
           tipo: p.tipo,
           cebo: ESPECIES[p.tipo].cebo,
+          lastrado: !!p.lastrado,
+          est: p.estado,
         })),
       });
     };
@@ -763,6 +788,12 @@ function VolateriaEngine({
       else if (r >= 2 && roll < 0.31) tipo = "acorazado";
       else if (r >= 2 && roll < humoTop + 0.09) tipo = "humo";
       else if (roll < 0.30 + 0.03 * Math.min(r, 6)) tipo = "zafiro";
+      /* V79: EL PATO LASTRADO — la feria le mete plomo falso a los
+         comunes: al primer toque se finge muerto y RESURVE. Se le
+         delata: vuela lento y se balancea cargado */
+      const lastrOk =
+        r >= TRAMPA.lastradoDesde && (tipo === "bronce" || tipo === "humo");
+      const lastr = lastrOk && rng() < TRAMPA.lastradoProb(r);
       const E = ESPECIES[tipo];
       /* origen aleatorio: bordes, juncos o cielo */
       const oR = rng();
@@ -819,7 +850,7 @@ function VolateriaEngine({
         estado: "vuelo",
         patron,
         idx,
-        hp: E.hp,
+        hp: lastr ? 2 : E.hp, // V79: el lastrado aguanta el teatro
         x,
         y,
         vx,
@@ -847,7 +878,13 @@ function VolateriaEngine({
         senBaja: false,
         scale: (coarse ? 1.22 : 1.5) * (tipo === "dorada" ? 0.92 : 1),
         flashT: 0,
+        lastrado: lastr,
+        teatro: false,
       };
+      if (lastr) {
+        nuevo.vx *= 0.85; // cargado: más lento ybalanceante
+        nuevo.vy *= 0.85;
+      }
       patos.push(nuevo);
       if (idx >= 0 && idx < VOLADA) res[idx] = "vivo";
       /* el mensajero trae una letra que falte del PREMIO (V71) */
@@ -1159,8 +1196,15 @@ function VolateriaEngine({
     /* el GLOBO DE PODER — asciende por la banda esperando plomo */
     const spawnGlobo = () => {
       const roll = rng();
+      /* V79: la GALLETA entra al carrusel de globos (18%) */
       const pw: GloboPoder =
-        roll < 0.4 ? "escopeta" : roll < 0.8 ? "tiempo" : "plomo";
+        roll < 0.34
+          ? "escopeta"
+          : roll < 0.62
+            ? "tiempo"
+            : roll < 0.8
+              ? "plomo"
+              : "galleta";
       const [, c0, c1] = PODER_COLOR[pw];
       globos.push({
         x: w * (0.1 + rng() * 0.8),
@@ -1349,10 +1393,63 @@ function VolateriaEngine({
         audio.tinc();
         return;
       }
+      /* V79: EL PATO LASTRADO — al primer toque SE FINGE MUERTO y
+         a mitad de caída resurge con risa de la feria. Sin racha,
+         sin puntos: la feria cobra el plomo y el teatro */
+      if (p.lastrado && p.hp > 1) {
+        p.hp--;
+        p.teatro = true; // conserva lastrado: el plomo falso sigue a la vista
+        p.flashT = 3;
+        p.estado = "caida";
+        p.vy = -1.2;
+        p.vx *= 0.3;
+        freezeT = reduced ? 0 : 2;
+        sacude(4);
+        vibra(12);
+        popups.push({
+          x: p.x,
+          y: p.y - 30,
+          txt: "¡LASTRADO!",
+          t: 0,
+          vida: 74,
+          color: "#e0b184",
+          serif: true,
+        });
+        popups.push({
+          x: p.x,
+          y: p.y - 52,
+          txt: "se finge muerto…",
+          t: 0,
+          vida: 74,
+          color: "rgba(250,246,236,0.75)",
+          serif: true,
+        });
+        for (let i = 0; i < 7; i++) {
+          const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.2;
+          plumas.push({
+            x: p.x,
+            y: p.y,
+            vx: Math.cos(a) * (1.2 + Math.random() * 1.8),
+            vy: Math.sin(a) * (1.2 + Math.random() * 1.8),
+            rot: Math.random() * 6.2832,
+            vr: (Math.random() - 0.5) * 0.22,
+            t: 0,
+            vida: 45 + Math.random() * 20,
+            c: E.ala,
+            s: 0.6 + Math.random() * 0.5,
+            sway: Math.random() * 6.2832,
+          });
+        }
+        audio.madera();
+        convocaZorro(p.x, false, true); // el feriante se ríe del truco
+        emit();
+        return;
+      }
       p.estado = "caida";
       p.flashT = 3;
       p.vy = -1.3;
       porEspecie[p.tipo] = (porEspecie[p.tipo] ?? 0) + 1;
+      if (p.lastrado) lastradosRun++; // V79: el lastrado cae DEL TODO — a la segunda
       freezeT = reduced ? 0 : 3; // hitstop — el mundo contiene el aliento
       vibra(15);
       racha++;
@@ -1361,6 +1458,26 @@ function VolateriaEngine({
       puntos += pts;
       hits++;
       volleyHits++;
+      /* V79: LA PLANCHA APRIETA — al quedar UNA presa para la cuota,
+         el feriante acelera la plancha: cierre de ronda con pulso.
+         La campanita lo anuncia (la feria avisa, jamás roba) */
+      if (!plancha && !esJefe(ronda)) {
+        const cq = cuotaModo(Math.max(1, ronda), modo);
+        if (cq > 1 && volleyHits === cq - 1) {
+          plancha = true;
+          audio.campana();
+          popups.push({
+            x: w * 0.5,
+            y: bandaBot + 44,
+            txt: "¡la plancha aprieta!",
+            t: 0,
+            vida: 80,
+            color: "rgba(250,246,236,0.9)",
+            serif: true,
+          });
+          emit();
+        }
+      }
       popups.push({
         x: p.x,
         y: p.y - 26,
@@ -1631,7 +1748,9 @@ function VolateriaEngine({
             ? "ESCOPETA ×2"
             : g.poder === "tiempo"
               ? "TIEMPO LENTO"
-              : "PLOMO +TODO",
+              : g.poder === "plomo"
+                ? "PLOMO +TODO"
+                : "GALLETA DE LA SUERTE",
         t: 0,
         vida: 78,
         color: g.c0,
@@ -1640,6 +1759,25 @@ function VolateriaEngine({
       if (g.poder === "plomo") {
         balas = cargador;
         recT = 0;
+      } else if (g.poder === "galleta") {
+        /* V79: LA GALLETA DE LA SUERTE — el próximo disparo en vacío
+           NO corta la racha. Si ya llevas una, la extra son oro */
+        if (!galleta) {
+          galleta = true;
+          audio.crunch();
+        } else {
+          puntos += TRAMPA.galletaPuntos;
+          popups.push({
+            x: g.x,
+            y: g.y - 58,
+            txt: `+${TRAMPA.galletaPuntos}`,
+            t: 0,
+            vida: 50,
+            color: "#ef9fae",
+            serif: false,
+          });
+          audio.tinc();
+        }
       } else {
         poder = g.poder;
         poderT = PODER_DURACION[g.poder];
@@ -1765,6 +1903,31 @@ function VolateriaEngine({
             serif: true,
           });
           audio.whoosh();
+        } else if (galleta) {
+          /* V79: LA GALLETA SE ROMPE en lugar de la racha — la suerte
+             del bolsillo solo cubre el plomo en vacío, jamás el cebo */
+          galleta = false;
+          galletasRun++;
+          popups.push({
+            x: xp,
+            y: yp - 30,
+            txt: "la galleta se rompe",
+            t: 0,
+            vida: 62,
+            color: "#ef9fae",
+            serif: true,
+          });
+          popups.push({
+            x: xp,
+            y: yp - 52,
+            txt: "la racha vive",
+            t: 0,
+            vida: 62,
+            color: "rgba(250,246,236,0.85)",
+            serif: false,
+          });
+          audio.crunch();
+          vibra(8);
         } else racha = 0; // el plomo perdido, sin presa cerca, corta
       }
       emit();
@@ -1956,6 +2119,8 @@ function VolateriaEngine({
         }
         ronda++;
         volleyHits = 0;
+        plancha = false; // V79: la plancha descansa entre rondas
+        apagonProg = 0; // V79: la lámpara se reprograma por oleada
         res = new Array(VOLADA).fill("pendiente");
         lanzados = 0;
         pendiente = 0;
@@ -2023,6 +2188,16 @@ function VolateriaEngine({
       balas = cargador;
       recT = 0;
       for (let i = 0; i < size; i++) spawnDuck();
+      /* V79: LA LÁMPARA QUE SIFA — a veces la feria apaga las luces
+         a mitad de oleada. Jefes jamás: la corona es espectáculo */
+      if (
+        ronda >= TRAMPA.apagonDesde &&
+        apagonT <= 0 &&
+        apagonProg <= 0 &&
+        rng() < TRAMPA.apagonProb
+      ) {
+        apagonProg = 240 + rng() * 240;
+      }
       emit();
     };
 
@@ -2085,6 +2260,13 @@ function VolateriaEngine({
       rebotesRun = 0;
       bandasRun = 0;
       perfectasSeguidas = 0;
+      /* V79: la feria trucada arranca limpia en cada tarde */
+      lastradosRun = 0;
+      galletasRun = 0;
+      galleta = false;
+      plancha = false;
+      apagonProg = 0;
+      apagonT = 0;
       for (const k of Object.keys(porEspecie)) delete porEspecie[k];
       if (c && (c.v === 1 || c.v === 2) && MODOS[c.modo]) {
         modo = diaria ? MODOS.feria : MODOS[c.modo];
@@ -2209,6 +2391,17 @@ function VolateriaEngine({
         if (globos.length === 0 && lanzados >= 1) spawnGlobo();
         globoT = 560 + rng() * 420;
       }
+      /* V79: LA LÁMPARA QUE SIFA — cuenta atrás al apagón, luego el
+         reloj: aviso (parpadeo+zumbido) → pleno → retorno */
+      if (apagonProg > 0) {
+        apagonProg -= dt;
+        if (apagonProg <= 0) {
+          apagonT = TRAMPA.apagonAviso + TRAMPA.apagonPleno + 40;
+          audio.zumbido();
+          emit();
+        }
+      }
+      if (apagonT > 0) apagonT -= dt;
       /* V71: la banda silvestre — desde la ronda 4, sin límite de cuota */
       if (ronda >= 4 && lanzados >= 1 && !esJefe(ronda)) {
         bandT -= dt;
@@ -2321,7 +2514,7 @@ function VolateriaEngine({
             }
           } else {
             /* patos reales — onda · zigzag · pica · rasante */
-            p.flap += p.flapRate * dtD;
+            p.flap += p.flapRate * (plancha ? 1.45 : 1) * dtD;
             /* FASES DEL PATO REAL (V68) — la escolta al 70% y la FURIA
                al 40%: picos y valles que premian la maestría */
             if (p.tipo === "real" && p.hp0) {
@@ -2447,7 +2640,11 @@ function VolateriaEngine({
               vyPat =
                 Math.sin(p.t * 0.05 + p.fase0) * 0.42 +
                 (p.targetY - p.y) * 0.0045;
-            p.x += (p.vx * fintaMul + p.ivx + vientoF * 1.05) * dtD;
+            p.x +=
+              (p.vx * fintaMul * (plancha ? TRAMPA.planchaMul : 1) +
+                p.ivx +
+                vientoF * 1.05) *
+              dtD;
             p.y += (vyPat * fintaMul + p.ivy) * dtD;
             /* bordes — el pato regresa a la feria */
             if (p.dir === 1 && p.x > w * 0.94) {
@@ -2532,30 +2729,75 @@ function VolateriaEngine({
             emit();
           }
         } else if (p.estado === "caida") {
-          p.flap += dtD;
-          p.vy = Math.min(7.2, p.vy + 0.27 * dtD);
-          p.y += p.vy * dtD;
-          p.x += p.fallDir * 0.55 * dtD;
-          p.rot += 0.13 * p.fallDir * dtD;
-          if (p.y >= grassY - 14) {
-            if (!p.bounced) {
-              p.bounced = true;
-              p.vy *= -0.36;
-              p.y = grassY - 14;
-              audio.golpeTierra();
-              sacude(4);
-            } else {
-              p.estado = "suelto";
-              p.restT = 46;
-              cadena = 0;
-              p.y = grassY - 14;
-              p.rot = p.fallDir > 0 ? 2.6 : -2.6;
-              if (p.idx >= 0 && p.idx < VOLADA) {
-                res[p.idx] = "acierto";
-                convocaZorro(p.x, true, false);
-                resueltoPato();
+          /* V79: el LASTRADO RESURVE a mitad de caída — la feria se
+             ríe, el pato queda escopeteado (hp 1) y la caza sigue */
+          if (p.teatro && (p.vy >= 2.3 || p.y >= grassY - 40)) {
+            p.teatro = false;
+            p.estado = "vuelo";
+            p.hp = 1;
+            p.vy = 0;
+            p.ivy = -2.8;
+            p.ivx = (p.x < w * 0.5 ? 1 : -1) * 2.2;
+            p.rot = 0;
+            p.bounced = false;
+            p.flashT = 3;
+            /* V79: la feria le da margen a su trampilla — el resurgido
+               NO se escapa sin dejarse cobrar el segundo toque */
+            p.escapeT = Math.max(p.escapeT, 150);
+            for (let k = 0; k < 10; k++) {
+              const a = Math.random() * 6.2832;
+              plumas.push({
+                x: p.x,
+                y: p.y,
+                vx: Math.cos(a) * (1.4 + Math.random() * 2),
+                vy: Math.sin(a) * (1.4 + Math.random() * 2) - 0.8,
+                rot: Math.random() * 6.2832,
+                vr: (Math.random() - 0.5) * 0.24,
+                t: 0,
+                vida: 48 + Math.random() * 22,
+                c: ESPECIES[p.tipo].ala,
+                s: 0.7 + Math.random() * 0.5,
+                sway: Math.random() * 6.2832,
+              });
+            }
+            popups.push({
+              x: p.x,
+              y: p.y - 42,
+              txt: "¡¡LA FERIA TRAMPOSA!!",
+              t: 0,
+              vida: 76,
+              color: "#e0b184",
+              serif: true,
+            });
+            audio.quack();
+            sacude(3);
+            emit();
+          } else {
+            p.flap += dtD;
+            p.vy = Math.min(7.2, p.vy + 0.27 * dtD);
+            p.y += p.vy * dtD;
+            p.x += p.fallDir * 0.55 * dtD;
+            p.rot += 0.13 * p.fallDir * dtD;
+            if (p.y >= grassY - 14) {
+              if (!p.bounced) {
+                p.bounced = true;
+                p.vy *= -0.36;
+                p.y = grassY - 14;
+                audio.golpeTierra();
+                sacude(4);
+              } else {
+                p.estado = "suelto";
+                p.restT = 46;
+                cadena = 0;
+                p.y = grassY - 14;
+                p.rot = p.fallDir > 0 ? 2.6 : -2.6;
+                if (p.idx >= 0 && p.idx < VOLADA) {
+                  res[p.idx] = "acierto";
+                  convocaZorro(p.x, true, false);
+                  resueltoPato();
+                }
+                emit();
               }
-              emit();
             }
           }
         } else {
@@ -2690,7 +2932,8 @@ function VolateriaEngine({
       c.scale(p.dir * p.scale, p.scale);
       const finta = p.fintaT > 0;
       const rigido = p.tipo === "senuelo";
-      /* el alabeo vive en el espacio espejado: nariz arriba siempre */
+      /* el alabeo vive en el espacio espejado: nariz arriba siempre.
+         V79: el lastrado se DELATA — se balancea cargado */
       c.rotate(
         muerto
           ? p.rot
@@ -2698,7 +2941,9 @@ function VolateriaEngine({
             ? Math.sin((24 - p.fintaT) * 0.6) * 0.5
             : rigido
               ? Math.sin(p.t * 0.12) * 0.07
-              : Math.max(
+              : p.lastrado
+                ? Math.sin(p.t * 0.09) * 0.24
+                : Math.max(
                   -0.32,
                   Math.min(
                     0.32,
@@ -2766,6 +3011,29 @@ function VolateriaEngine({
       c.beginPath();
       c.ellipse(-2, 6, 16, 6.4, 0, 0, 6.2832);
       c.fill();
+
+      /* V79: el LASTRADO lleva el plomo falso a la vista — cuerda y
+         bola gris balanceándose bajo el cuerpo: el tell honesto */
+      if (p.lastrado) {
+        const sw = Math.sin(p.t * 0.09) * 5;
+        c.strokeStyle = "rgba(40,34,28,0.8)";
+        c.lineWidth = 1.2;
+        c.beginPath();
+        c.moveTo(2, 12);
+        c.quadraticCurveTo(2 + sw * 0.6, 20, 4 + sw, 26);
+        c.stroke();
+        c.fillStyle = "#5a5e66";
+        c.beginPath();
+        c.arc(4 + sw, 28.5, 4.4, 0, 6.2832);
+        c.fill();
+        c.strokeStyle = "rgba(12,10,8,0.6)";
+        c.lineWidth = 1;
+        c.stroke();
+        c.fillStyle = "rgba(255,255,255,0.28)";
+        c.beginPath();
+        c.arc(2.6 + sw, 27, 1.3, 0, 6.2832);
+        c.fill();
+      }
 
       /* el señuelo delata su madera: veta y palo */
       if (p.tipo === "senuelo") {
@@ -3417,6 +3685,52 @@ function VolateriaEngine({
         c.fillRect(0, 0, w, h);
         c.fillStyle = "rgba(127,212,194,0.35)";
         c.fillRect(0, 0, w, 2);
+      }
+      /* V79: LA LÁMPARA QUE SIFA — la feria a oscuras. Aviso: parpadeo
+         suave (cortés con reduced-motion). Pleno: siluetas — solo los
+         OJOS de la presa viva lucen como luciérnagas, y los globos
+         siguen brillando. La mira se dibuja después: jamás se apaga */
+      if (apagonT > 0) {
+        let a: number;
+        if (apagonT > TRAMPA.apagonAviso + TRAMPA.apagonPleno) {
+          a = reduced
+            ? 0.05
+            : 0.1 + 0.07 * Math.sin(apagonT * 0.5);
+        } else if (apagonT > 40) {
+          a = 0.84;
+        } else {
+          a = 0.84 * (apagonT / 40);
+        }
+        c.fillStyle = `rgba(4,3,8,${a.toFixed(3)})`;
+        c.fillRect(0, 0, w, h);
+        if (a > 0.4) {
+          for (const p of patos) {
+            if (p.estado !== "vuelo" && !p.teatro) continue;
+            const ex = p.x + p.dir * p.scale * 24.5;
+            const ey = p.y - p.scale * 16.5;
+            c.save();
+            c.globalAlpha =
+              0.55 + 0.25 * Math.sin(tGlobal * 6 + p.tid * 1.7);
+            drawGlow(
+              c,
+              p.tipo === "cuervo" ? SPR.fuego : SPR.dorada,
+              ex,
+              ey,
+              10 * p.scale,
+            );
+            c.fillStyle = p.tipo === "cuervo" ? "#ff7a5a" : "#ffd97a";
+            c.beginPath();
+            c.arc(ex, ey, 1.7 * p.scale, 0, 6.2832);
+            c.fill();
+            c.restore();
+          }
+          for (const g of globos) {
+            c.save();
+            c.globalAlpha = 0.5;
+            drawGlow(c, SPR.dorada, g.x, g.y, 24);
+            c.restore();
+          }
+        }
       }
       /* la mira NUNCA tiembla con la sala — apunta firme */
       dibujarMira(c);

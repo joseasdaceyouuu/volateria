@@ -23,6 +23,9 @@
    8g. V78 EL FANTASMA: fantasma sembrado → botón en el cartel →
       replay dispara SOLO (sin input), input vivo bloqueado, SALIR
       vuelve al cartel, y la diaria real graba (grabando=true).
+   8h. V79 LA FERIA TRUCADA: contrato lastrados/galletas/galleta/
+      apagon/plancha + run sembrada (ronda 3, semilla fija) donde el
+      LASTRADO cae A LA SEGUNDA y el contador lo firma.
    9. MÓVIL 390: la feria vive (fps>=3) y el tap dispara (balas--).
   10. ESC sin salida (el juego ES la raíz). Cero errores de consola.
    Capturas en download/audit-volateria/. */
@@ -562,6 +565,97 @@ check(
 );
 await page.keyboard.press("Escape");
 await sleep(500);
+await page.getByRole("button", { name: "Cartel" }).click();
+await sleep(600);
+
+/* ── 8h · V79 — LA FERIA TRUCADA ─────────────────────────────────
+   Contrato de telemetría (lastrados/galletas/galleta/apagon/plancha)
+   y demo determinista: se CONTINUAR una run v2 sembrada en ronda 3
+   con semilla+estado fijos — el mismo cielo SIEMPRE — y la caza
+   programática hace caer al LASTRADO a la segunda. */
+await page.evaluate(() => {
+  try {
+    localStorage.setItem(
+      "vp-run",
+      JSON.stringify({
+        v: 2, ronda: 3, puntos: 500, racha: 0, hits: 0, escapes: 0,
+        tiros: 0, letras: "", modo: "feria", diaria: false,
+        semilla: 987654321, estado: 987654321,
+      }),
+    );
+  } catch {}
+});
+await page.reload();
+await sleep(4200);
+await page.getByRole("button", { name: /Continuar/ }).click();
+await sleep(1200);
+const vivo79 = await hasta(
+  page,
+  () => {
+    const d = window.__labD05Dbg ?? {};
+    return (d.patos ?? []).some((q) => q.viva && !q.cebo) ? true : null;
+  },
+  30000,
+  200,
+);
+const contrato79 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return {
+    tiene: ["lastrados", "galletas", "galleta", "apagon", "plancha"].every(
+      (k) => k in d,
+    ),
+    lastrados: d.lastrados ?? -1,
+    galleta: d.galleta ?? null,
+    apagon: d.apagon ?? null,
+    plancha: d.plancha ?? null,
+  };
+});
+check(
+  "v79 — contrato trucado en telemetría (5 campos V79)",
+  vivo79 === true && contrato79.tiene,
+  JSON.stringify(contrato79),
+);
+/* caza programática: clic sobre la presa viva (el lastrado pide DOS)
+   hasta que el contador lo firma — plazo generoso a dt SwiftShader */
+const plazo79 = Date.now() + 90000;
+while (Date.now() < plazo79) {
+  const st = await page.evaluate(() => {
+    const d = window.__labD05Dbg ?? {};
+    const vivo = (d.patos ?? []).find((q) => q.viva && !q.cebo);
+    return {
+      vivo: vivo ? { x: vivo.x, y: vivo.y } : null,
+      balas: d.balas ?? 0,
+      lastrados: d.lastrados ?? 0,
+      fase: d.fase ?? "",
+    };
+  });
+  if (st.lastrados >= 1) break;
+  if (st.fase !== "jugando") break; // la tarde se cerró sin lastrado
+  if (!st.vivo) {
+    await sleep(500);
+    continue;
+  }
+  if (st.balas <= 0) await page.keyboard.press("r");
+  else await page.mouse.click(st.vivo.x * 1440, st.vivo.y * 900);
+  await sleep(430);
+}
+const last79 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return {
+    lastrados: d.lastrados ?? 0,
+    galletas: d.galletas ?? 0,
+    apagonVivo: d.apagon ?? false,
+    planchaViva: d.plancha ?? false,
+  };
+});
+check(
+  "v79 — el lastrado cayó A LA SEGUNDA (lastrados>=1, semilla fija)",
+  last79.lastrados >= 1,
+  JSON.stringify(last79),
+);
+await page.screenshot({ path: `${OUT}07-trucada.png` });
+await page.keyboard.press("Escape");
+await sleep(400);
 await page.getByRole("button", { name: "Cartel" }).click();
 await sleep(600);
 

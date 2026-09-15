@@ -99,6 +99,19 @@ export type RunSnapshot = {
   estado?: number; // V75: estado del rng al salvar — la tarde sigue exacta
 };
 
+/* ── V79: LA FERIA TRUCADA — trampas de la casa y engalos del
+   cazador. Todo telegrafiado: la feria engaña, jamás roba. ── */
+export const TRAMPA = {
+  apagonDesde: 3, // ronda donde LA LÁMPARA QUE SIFA empieza
+  apagonProb: 0.24, // por oleada no-jefe (rng, determinista)
+  apagonAviso: 60, // frames de parpadeo-y-zumbido antes del brete
+  apagonPleno: 210, // frames de oscuridad plena (~3.5 s)
+  lastradoDesde: 3, // ronda donde el LASTRADO entra en escena
+  lastradoProb: (r: number) => 0.11 + 0.015 * Math.min(r, 8),
+  planchaMul: 1.28, // LA PLANCHA APRIETA al cierre de la cuota
+  galletaPuntos: 150, // galleta extra cuando ya llevas una puesta
+} as const;
+
 /* llaves del localStorage de la meta (V72) */
 export const ARCHIVO_KEY = "vp-archivo";
 export const TROFEOS_KEY = "vp-trofeos";

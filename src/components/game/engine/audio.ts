@@ -317,8 +317,33 @@ export class VolateriaAudio {
   /* VOLADA PERFECTA — arpegio mayor limpio, premio del 8/8 */
   perfecta() {
     const seq = [523, 659, 784, 1047];
-    seq.forEach((f, i) => this.nota("triangle", f, f, 0.1, 0.12, i * 0.07));
+    seq.forEach((f, i) =>
+      this.nota("triangle", f, f, 0.1, 0.12, i * 0.07),
+    );
     this.nota("triangle", 1319, 1319, 0.3, 0.1, 0.3);
+  }
+
+  /* ── V79: LA FERIA TRUCADA — tres voces nuevas ── */
+  /* la lámpara que sifa — zumbido eléctrico que ANUNCIA el apagón */
+  zumbido() {
+    this.nota("sawtooth", 118, 96, 0.5, 0.1, 0, {
+      tipo: "lowpass",
+      freq: 420,
+    });
+    this.nota("square", 236, 236, 0.07, 0.05, 0.18);
+    this.nota("square", 236, 236, 0.07, 0.05, 0.34);
+  }
+  /* la plancha aprieta — campanita de feriante al cierre de cuota */
+  campana() {
+    this.nota("sine", 1318, 1310, 0.24, 0.09);
+    this.nota("sine", 1975, 1968, 0.16, 0.045, 0.01);
+    this.nota("sine", 1318, 1310, 0.2, 0.07, 0.16);
+  }
+  /* la galleta de la suerte — crujido dulce al romperla */
+  crunch() {
+    this.rafaga(0.09, 0.16, 900, 220, 0, "lowpass");
+    this.nota("triangle", 620, 520, 0.07, 0.07, 0.02);
+    this.nota("triangle", 780, 660, 0.09, 0.07, 0.1);
   }
 
   /* ── V70: LA CAPA DE MANO CALIENTE — bajo que pulsa con el ×3,

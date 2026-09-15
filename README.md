@@ -1,8 +1,9 @@
 # VOLATERÍA 🦆
 
 **El tiro al pato de feria, reimaginado.** Un arcade de caza completo en el
-navegador: oleadas veloces con vuelo evasivo, señuelos traidores, globos de
-poder, jefes rotativos (EL PATO REAL y LA BANDADA REAL), viento de feria,
+navegador: oleadas veloces con vuelo evasivo, señuelos traidores, trampas de
+la casa (apagones, lastrados y la plancha apretada), globos de poder,
+jefes rotativos (EL PATO REAL y LA BANDADA REAL), viento de feria,
 tres modos de juego, Volada del Día con FANTASMA revivible y una feria con
 memoria. Instalable como app (PWA) y jugable offline.
 
@@ -10,8 +11,27 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.6.0)
+## La feria (v1.7.0)
 
+- **LA FERIA TRUCADA (V79)** — trampas de la casa y engalos del cazador,
+  todo telegrafiado: la feria engaña, jamás roba.
+  - **LA LÁMPARA QUE SIFA** — desde la ronda 3, la feria apaga las luces
+    a mitad de oleada: zumbido y parpadeo lo anuncian, y en el pleno solo
+    los OJOS de la presa viva lucen como luciérnagas (el cuervo, rojo).
+    La mira jamás se apaga. Jefes nunca: la corona es espectáculo.
+  - **EL PATO LASTRADO** — bronce y humo pueden venir con plomo falso:
+    se delatan balanceándose con la bola colgante. Al primer toque SE
+    FINGE MUERTO y resurge con risa de la feria; a la segunda cae del
+    todo y el archivo lo cuenta. El trofeo A LA SEGUNDA espera.
+  - **LA PLANCHA APRIETA** — al quedar una sola presa para la cuota,
+    la campanita suena y la oleada acelera ×1.28: cierre con pulso.
+  - **LA GALLETA DE LA SUERTE** — el globo rosado del carrusel (18%):
+    el próximo disparo en vacío NO rompe la racha (si ya llevas una,
+    la extra paga +150). El cebo sigue cobrando: la suerte no perdona
+    maderas ni cuervos.
+- **Auditoría de diseño aplicada** — el cartel SCROLLEA en pantallas
+  bajas (nada pisa ya la firma en móvil), el SONIDO del cartel vive solo
+  en su esquina (había dos) y la pausa ganó su botón ⚙ AJUSTES.
 - **El fantasma de la feria (V78)** — tu mejor Volada del Día del día queda
   grabada tiro a tiro: el cartel ofrece **☾ EL FANTASMA** y la tarde se
   revive sola (mismo cielo sembrado, mismos disparos en el mismo instante).

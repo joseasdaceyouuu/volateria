@@ -17,7 +17,9 @@ export type TipoPato =
 export type EstadoPato = "vuelo" | "caida" | "suelto" | "fuga";
 export type Patron = "onda" | "zigzag" | "pica" | "rasante" | "cruce" | "poste";
 export type Poder = "" | "escopeta" | "tiempo";
-export type GloboPoder = "escopeta" | "tiempo" | "plomo";
+/* V79: la GALLETA se suma a los globos de poder — la suerte
+   portátil: el próximo disparo en vacío no romperá la racha */
+export type GloboPoder = "escopeta" | "tiempo" | "plomo" | "galleta";
 
 export type Especie = {
   cuerpo0: string;
@@ -207,9 +209,11 @@ export const PATRON_VEL: Record<Patron, number> = {
   poste: 1,
 };
 
-/* los globos de poder — colores rgb (chispas) + hex (dibujo) */
+/* los globos de poder — colores rgb (chispas) + hex (dibujo).
+   V79: la galleta llega rosada — el único dulce de la feria */
 export const PODER_COLOR: Record<GloboPoder, [string, string, string]> = {
   escopeta: ["224,138,82", "#e08a52", "#8a3d20"],
   tiempo: ["127,212,194", "#7fd4c2", "#2a6e60"],
   plomo: ["236,200,106", "#ecc86a", "#8f6a1e"],
+  galleta: ["239,159,174", "#ef9fae", "#8f4250"],
 };

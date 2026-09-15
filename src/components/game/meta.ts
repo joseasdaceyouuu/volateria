@@ -71,6 +71,16 @@ export const TROFEOS: Trofeo[] = [
     nombre: "DIEZ MIL",
     desc: "10.000 puntos en una tarde",
   },
+  {
+    id: "lastrado",
+    nombre: "A LA SEGUNDA",
+    desc: "reventó 3 lastrados en una tarde",
+  },
+  {
+    id: "suerte",
+    nombre: "LA SUERTE EXISTE",
+    desc: "la galleta salvó tu racha",
+  },
 ];
 
 /* ── el archivo del cazador — estadísticas de vida ── */
@@ -88,6 +98,8 @@ export type Archivo = {
   premios: number; // V76: PREMIOS completados de toda la vida
   rebotes: number; // V76: plomo que el espejo mandó de vuelta
   bandas: number; // V76: formaciones completas caídas por el guía
+  lastrados: number; // V79: lastrados reventados del todo
+  galletas: number; // V79: fallos que la galleta perdonó
 };
 
 export const ARCHIVO_VACIO: Archivo = {
@@ -104,6 +116,8 @@ export const ARCHIVO_VACIO: Archivo = {
   premios: 0,
   rebotes: 0,
   bandas: 0,
+  lastrados: 0,
+  galletas: 0,
 };
 
 export const leeArchivo = (): Archivo => {
@@ -147,6 +161,8 @@ export const fusionaArchivo = (a: Archivo, s: VolateriaStats): Archivo => ({
   premios: a.premios + s.premios,
   rebotes: a.rebotes + s.rebotes,
   bandas: a.bandas + s.bandas,
+  lastrados: a.lastrados + s.lastrados,
+  galletas: a.galletas + s.galletas,
 });
 
 /* ── V76: LA ESCALADA — el rango de maestría que paga cada récord ── */
@@ -237,6 +253,8 @@ export const trofeosGanados = (
   add("alpelo", s.grazes >= 10);
   add("veterano10", s.ronda >= 10);
   add("diezmil", s.puntos >= 10000);
+  add("lastrado", s.lastrados >= 3);
+  add("suerte", s.galletas >= 1);
   return gana.filter(Boolean);
 };
 

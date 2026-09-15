@@ -2,10 +2,12 @@
 
 > El tiro al pato de feria, reimaginado: atardecer de lona, zorro cómplice y un cargador que nunca sobra.
 
-## En escena (v1.6.0)
+## En escena (v1.7.0)
 
 Lo que ya luces bajo las bombillas de la feria:
 
+- **LA FERIA TRUCADA (V79)** — trampas de la casa y engalos del cazador, todo telegrafiado: **LA LÁMPARA QUE SIFA** apaga las luces a mitad de oleada (zumbido + parpadeo lo anuncian; en el pleno solo los ojos de la presa viva lucen, el cuervo en rojo, y la mira jamás se apaga); **EL PATO LASTRADO** viene con la bola colgante a la vista, se finge muerto al primer toque y resurge con risa de la feria (a la segunda cae del todo — trofeo A LA SEGUNDA); **LA PLANCHA APRIETA** al cierre de cuota (campanita + velocidad ×1.28); y **LA GALLETA DE LA SUERTE**, el globo rosado que perdona un disparo en vacío sin romper la racha (trofeo LA SUERTE EXISTE). El archivo cuenta lastrados y galletas.
+- **Diseño auditado** — el cartel scrollea en pantallas bajas (adiós al solape móvil), un solo botón de sonido en el cartel y ⚙ AJUSTES alcanzable desde la pausa.
 - **El fantasma de la feria (V78)** — la Volada del Día graba cada disparo con el reloj de la tarde y al caer deja un fantasma: tu mejor diaria del día, revivible tiro a tiro desde el cartel (☾). El replay dispara solo (input bloqueado) y sin tocar honores: ni récord, ni sello, ni podio, ni archivo.
 - **La primera vez (V77)** — la guía susurra tres consejos en la ronda 1 de la primera visita (mira, engaños, recarga) y se despide para siempre al cerrar la tarde; la CADENA DE PERFECTAS multiplica la hazaña seguida (×2 y ×3).
 - **La escalada (V76)** — rango de maestría por modo (APRENDIZ→LEYENDA) en el archivo y en el fin, el podio local con las cinco mejores tardes de cada modo (la diaria marca ☀), y el bestiario cuenta rebotes del espejo y bandas íntegras.
