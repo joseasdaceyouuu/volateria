@@ -142,6 +142,8 @@ const FASE_INICIAL: VolateriaStats = {
   apagon: false,
   plancha: false,
   motivoFin: "",
+  jefeCoronas: 0,
+  jefeVida: 0,
   porEspecie: {},
   patos: [],
 };
@@ -173,11 +175,13 @@ export default function Volateria() {
   const [sello] = useState(() => leeSelloDiario());
   const [archivoAbierto, setArchivoAbierto] = useState(false);
   /* V81: el archivo se lee FRESCO del bolsillo — al abrir el panel y
-     en cada cierre de tarde (sin setState en efectos, regla react-hooks) */
-  const archivo = useMemo<Archivo>(
-    () => leeArchivo(),
-    [stats.fase, stats.puntos, archivoAbierto],
-  );
+     en cada cierre de tarde (sin setState en efectos, regla react-hooks).
+     V82: la llave de refresco se USA dentro — lint honesto, misma causa */
+  const archivoLlave = `${archivoAbierto}|${stats.fase}|${stats.puntos}`;
+  const archivo = useMemo<Archivo>(() => {
+    void archivoLlave; // la lectura es fresca: la llave SOLO refresca
+    return leeArchivo();
+  }, [archivoLlave]);
   /* V76: el podio — se lee fresco del bolsillo al abrir el archivo */
   const [podioVista, setPodioVista] = useState<Record<string, PodioRun[]>>(
     () => leePodio(),
@@ -344,6 +348,8 @@ export default function Volateria() {
       apagon: stats.apagon,
       plancha: stats.plancha,
       motivoFin: stats.motivoFin,
+      jefeCoronas: stats.jefeCoronas,
+      jefeVida: stats.jefeVida,
       porEspecie: stats.porEspecie,
       patos: stats.patos,
     };
@@ -1070,6 +1076,24 @@ export default function Volateria() {
               on={!stats.muted}
               onToggle={() => apiRef.current?.snd()}
             />
+          </div>
+        )}
+
+        {/* V82: EL JEFE SE LEE — coronas en vuelo o vidas de la corona,
+           a la vista en todo momento: nadie dispara a ciegas a un ave
+           que aguanta, y el cierre de la ronda se entiende sin adivinar */}
+        {jugando && (stats.jefeCoronas > 0 || stats.jefeVida > 0) && (
+          <div
+            aria-live="polite"
+            className="pointer-events-none absolute left-1/2 top-4 z-[93] -translate-x-1/2 rounded-full border border-copper/50 bg-[#0a0908]/70 px-4 py-1.5 backdrop-blur-sm"
+          >
+            <p className="font-mono text-[10px] uppercase tracking-[0.26em] text-copper">
+              {stats.jefeCoronas > 0
+                ? `coronas ${"●".repeat(stats.jefeCoronas)}`
+                : `la corona ${"●".repeat(Math.min(6, stats.jefeVida))}${
+                    stats.jefeVida > 6 ? ` ×${stats.jefeVida}` : ""
+                  }`}
+            </p>
           </div>
         )}
 

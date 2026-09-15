@@ -228,6 +228,8 @@ export type VolateriaStats = {
   apagon: boolean; // V79: LA LÁMPARA QUE SIFA está (o llega) en escena
   plancha: boolean; // V79: LA PLANCHA APRIETA (cierre de cuota veloz)
   motivoFin: string; // V81: la feria explica por qué se cerró la tarde
+  jefeCoronas: number; // V82: coronas de la BANDADA aún en vuelo (0 sin jefe)
+  jefeVida: number; // V82: vidas de LA CORONA del PATO REAL (0 sin jefe)
   porEspecie: Record<string, number>; // cazados por especie (V72)
   patos: PatoTelemetria[];
 };
@@ -594,6 +596,15 @@ function VolateriaEngine({
         apagon: apagonT > 0,
         plancha,
         motivoFin,
+        jefeCoronas: patos.reduce(
+          (s, p) => s + (p.tipo === "real" && p.mini && p.estado === "vuelo" ? 1 : 0),
+          0,
+        ),
+        jefeVida: patos.reduce(
+          (s, p) =>
+            s + (p.tipo === "real" && !p.mini && p.estado === "vuelo" ? p.hp : 0),
+          0,
+        ),
         porEspecie: { ...porEspecie },
         enCola: Math.max(0, VOLADA - lanzados),
         resultados: res.slice(),
@@ -623,6 +634,7 @@ function VolateriaEngine({
           lastrado: !!p.lastrado,
           err: !!p.erratico,
           est: p.estado,
+          hp: p.hp, // V82: la sonda lee el blindaje del jefe
         })),
       });
     };
@@ -1815,6 +1827,23 @@ function VolateriaEngine({
       if (recT > 0 || balas <= 0) {
         audio.clic();
         kick = 0.45;
+        /* V82: EL CAÑÓN SECO — un clic sin balas arma la recarga y lo
+           grita junto a la mira. En táctil el cargador ya se reponía
+           solo: escritorio iguala. Nada de aves "inmatables" por un
+           cargador vacío — la feria avisa, jamás roba. El fantasma no
+           toca el cañón: el replay queda byte a byte */
+        if (balas <= 0 && recT <= 0 && !replayActivo) {
+          recargarInterno();
+          popups.push({
+            x: Math.min(w - 80, Math.max(80, cx)),
+            y: Math.max(72, cy - 30),
+            txt: "¡sin plomo! recargando",
+            t: 0,
+            vida: 62,
+            color: "#e0b184",
+            serif: true,
+          });
+        }
         emit();
         return;
       }
@@ -3976,7 +4005,9 @@ function VolateriaEngine({
       if (apiRef) apiRef.current = null;
       if (gl && prog) gl.deleteProgram(prog);
     };
-  }, []);
+    /* V82: apiRef en dependencias — la ref del padre es estable
+       (useRef): el motor nace una vez y el lint queda honesto */
+  }, [apiRef]);
 
   return (
     <div ref={rootRef} className={className}>

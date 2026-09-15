@@ -832,6 +832,87 @@ check(
   JSON.stringify(motivo81),
 );
 
+/* ── 8k · V82 — EL CAÑÓN SECO ────────────────────────────────────
+   El agujero real del "ave inmatable": la bandada pide 12 impactos
+   con 15 balas y en escritorio quedarse a cero dejaba el clic SECO
+   para siempre (la recarga automática era solo de táctil). Ahora el
+   cañón seco SE REPONE SOLO al clic y lo grita junto a la mira.
+   Reproducción exacta del reporte: gastar el cargador a propósito,
+   luego cazar las tres coronas SIN tocar R jamás → deben caer las
+   tres y la ronda avanzar. El jefe, además, SE LEE (jefeCoronas). */
+await page.evaluate(() => {
+  try {
+    localStorage.setItem(
+      "vp-run",
+      JSON.stringify({
+        v: 2, ronda: 8, puntos: 5000, racha: 0, hits: 0, escapes: 0,
+        tiros: 0, letras: "", modo: "feria", diaria: false,
+        semilla: 42, estado: 42,
+      }),
+    );
+  } catch {}
+});
+await page.reload({ waitUntil: "domcontentloaded" });
+await sleep(4200);
+await page.getByRole("button", { name: /Continuar/ }).click();
+await sleep(1500);
+/* fase A — fundir el cargador a tiro fijo al vacío (esquina baja) */
+let dry82 = false;
+for (let i = 0; i < 40 && !dry82; i++) {
+  await page.mouse.click(200, 780);
+  await sleep(300);
+  dry82 = await page.evaluate(() => (window.__labD05Dbg?.balas ?? 1) <= 0);
+}
+check(
+  "v82 — el cargador se FUNDIO a tiro fijo (balas=0, sin tocar R)",
+  dry82 === true,
+  `dry=${dry82}`,
+);
+/* fase B — cazar la bandada con el cañón seco: el clic debe armar
+   la recarga solo; jamás se pulsa R. jefeCoronas 3→0 legible */
+const fase82 = { seen3: false, refeito: false, ronda: 0, jc: -1 };
+const plazo82 = Date.now() + 120000;
+while (Date.now() < plazo82) {
+  const st = await page.evaluate(() => {
+    const d = window.__labD05Dbg ?? {};
+    const c = (d.patos ?? []).find((q) => q.tipo === "real" && q.viva);
+    return {
+      c: c ? { x: c.x, y: c.y } : null,
+      ronda: d.ronda ?? 0,
+      fase: d.fase ?? "",
+      balas: d.balas ?? 0,
+      rec: d.recargando ?? false,
+      jc: d.jefeCoronas ?? -1,
+    };
+  });
+  fase82.ronda = st.ronda;
+  fase82.jc = st.jc;
+  if (st.jc === 3) fase82.seen3 = true;
+  /* el repuesto se prueba por balas>0 SIN haber pulsado R jamás */
+  if (dry82 && !fase82.refeito && st.balas > 0) fase82.refeito = true;
+  if (st.ronda >= 9) break;
+  if (st.fase !== "jugando") break;
+  if (st.c) await page.mouse.click(st.c.x * 1440, st.c.y * 900);
+  else await page.mouse.click(200, 780);
+  await sleep(300);
+}
+check(
+  "v82 — telemetría del jefe: tres coronas leídas (jefeCoronas=3)",
+  fase82.seen3 === true,
+  JSON.stringify(fase82),
+);
+check(
+  "v82 — el cañón seco se REPONE SOLO (recarga armada sin R)",
+  fase82.refeito === true,
+  JSON.stringify(fase82),
+);
+check(
+  "v82 — sin tocar R jamás, las tres coronas CAEN (ronda 9)",
+  fase82.ronda >= 9,
+  JSON.stringify(fase82),
+);
+await page.screenshot({ path: `${OUT}10-cañon-seco.png` });
+
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
 mob.on("pageerror", (e) => errors.push(`mob pageerror: ${e.message}`));

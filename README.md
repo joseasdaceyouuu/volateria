@@ -11,8 +11,18 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.9.0)
+## La feria (v1.10.0)
 
+- **EL CAÑÓN SECO (V82)** — la raíz de verdad del "ave inmatable": la
+  Bandada pide 12 impactos con 15 balas y, en escritorio, quedarse a
+  cero dejaba el clic SECO para siempre (la recarga automática era
+  solo de táctil). Ahora un clic sin balas ARMA la recarga y lo
+  grita junto a la mira ("¡sin plomo! recargando") — y el fantasma
+  queda byte a byte. Además el jefe SE LEE: chip "coronas ●●●" en
+  la sala (o "la corona ●●●" para el PATO REAL) para saber siempre
+  cuánto plomo falta, y la telemetría suma jefeCoronas/jefeVida/hp
+  para la sonda. QA: nueva prueba 8k que funde el cargador a tiro
+  fijo y derriba las tres coronas SIN tocar R jamás.
 - **LA FUGA AVISADA (V81)** — el fin de la feria ya no pilla a nadie: la
   fuga se VE venir y el final se EXPLICA solo.
   - **Las coronas avisan** — la Bandada Real arde en un anillo de oro a
