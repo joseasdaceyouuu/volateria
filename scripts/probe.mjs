@@ -572,23 +572,34 @@ await sleep(600);
    Contrato de telemetría (lastrados/galletas/galleta/apagon/plancha)
    y demo determinista: se CONTINUAR una run v2 sembrada en ronda 3
    con semilla+estado fijos — el mismo cielo SIEMPRE — y la caza
-   programática hace caer al LASTRADO a la segunda. */
-await page.evaluate(() => {
-  try {
-    localStorage.setItem(
-      "vp-run",
-      JSON.stringify({
-        v: 2, ronda: 3, puntos: 500, racha: 0, hits: 0, escapes: 0,
-        tiros: 0, letras: "", modo: "feria", diaria: false,
-        semilla: 987654321, estado: 987654321,
-      }),
-    );
-  } catch {}
-});
-await page.reload();
-await sleep(4200);
-await page.getByRole("button", { name: /Continuar/ }).click();
-await sleep(1200);
+   programática hace caer al LASTRADO a la segunda.
+   V80 blindaje: el tirador programático SOLO caza lastrados (matar
+   otras presas puede cerrar la volada antes de que el lastrado
+   aparezca) y reintenta hasta 4 tardes — el cielo (semilla) es el mismo,
+   el timing del renderer no. */
+const siembraRun79 = async (intento = 1) => {
+  await page.evaluate((n) => {
+    try {
+      localStorage.setItem(
+        "vp-run",
+        JSON.stringify({
+          v: 2, ronda: 3, puntos: 500, racha: 0, hits: 0, escapes: 0,
+          tiros: 0, letras: "", modo: "feria", diaria: false,
+          semilla: 987654321, /* cielo fijo */
+          estado: 987654321 + (n - 1) * 7919, /* reparto distinto por intento:
+            el lastrado sale con p≈0.145 por bronce/humo — ~1/3 de las
+            tardes no nace ninguno; cambiar el reparto evita tirar la
+            misma moneda tres veces (lección del CI de v1.7.0) */
+        }),
+      );
+    } catch {}
+  }, intento);
+  await page.reload();
+  await sleep(4200);
+  await page.getByRole("button", { name: /Continuar/ }).click();
+  await sleep(1200);
+};
+await siembraRun79(1);
 const vivo79 = await hasta(
   page,
   () => {
@@ -615,39 +626,51 @@ check(
   vivo79 === true && contrato79.tiene,
   JSON.stringify(contrato79),
 );
-/* caza programática: clic sobre la presa viva (el lastrado pide DOS)
-   hasta que el contador lo firma — plazo generoso a dt SwiftShader */
-const plazo79 = Date.now() + 90000;
-while (Date.now() < plazo79) {
-  const st = await page.evaluate(() => {
-    const d = window.__labD05Dbg ?? {};
-    const vivo = (d.patos ?? []).find((q) => q.viva && !q.cebo);
-    return {
-      vivo: vivo ? { x: vivo.x, y: vivo.y } : null,
-      balas: d.balas ?? 0,
-      lastrados: d.lastrados ?? 0,
-      fase: d.fase ?? "",
-    };
-  });
-  if (st.lastrados >= 1) break;
-  if (st.fase !== "jugando") break; // la tarde se cerró sin lastrado
-  if (!st.vivo) {
-    await sleep(500);
-    continue;
+/* caza programática: SOLO lastrados (V80 blindaje) — hasta 4 tardes */
+let last79 = null;
+for (
+  let intento = 1;
+  intento <= 4 && !(last79 && last79.lastrados >= 1);
+  intento++
+) {
+  if (intento > 1) await siembraRun79(intento);
+  const plazo79 = Date.now() + 55000;
+  while (Date.now() < plazo79) {
+    const st = await page.evaluate(() => {
+      const d = window.__labD05Dbg ?? {};
+      const last = (d.patos ?? []).find(
+        (q) => q.viva && !q.cebo && q.lastrado,
+      );
+      return {
+        last: last ? { x: last.x, y: last.y } : null,
+        balas: d.balas ?? 0,
+        lastrados: d.lastrados ?? 0,
+        fase: d.fase ?? "",
+      };
+    });
+    if (st.lastrados >= 1) break;
+    if (st.fase !== "jugando") break; // la tarde se cerró sin lastrado
+    if (!st.last) {
+      await sleep(400);
+      continue;
+    }
+    if (st.balas <= 0) await page.keyboard.press("r");
+    else await page.mouse.click(st.last.x * 1440, st.last.y * 900);
+    await sleep(430);
   }
-  if (st.balas <= 0) await page.keyboard.press("r");
-  else await page.mouse.click(st.vivo.x * 1440, st.vivo.y * 900);
-  await sleep(430);
-}
-const last79 = await page.evaluate(() => {
-  const d = window.__labD05Dbg ?? {};
-  return {
-    lastrados: d.lastrados ?? 0,
-    galletas: d.galletas ?? 0,
-    apagonVivo: d.apagon ?? false,
-    planchaViva: d.plancha ?? false,
+  last79 = {
+    ...(await page.evaluate(() => {
+      const d = window.__labD05Dbg ?? {};
+      return {
+        lastrados: d.lastrados ?? 0,
+        galletas: d.galletas ?? 0,
+        apagonVivo: d.apagon ?? false,
+        planchaViva: d.plancha ?? false,
+      };
+    })),
+    intentos: intento,
   };
-});
+}
 check(
   "v79 — el lastrado cayó A LA SEGUNDA (lastrados>=1, semilla fija)",
   last79.lastrados >= 1,
@@ -658,6 +681,57 @@ await page.keyboard.press("Escape");
 await sleep(400);
 await page.getByRole("button", { name: "Cartel" }).click();
 await sleep(600);
+
+/* ── 8i · V80 — LA CUENTA LARGA ────────────────────────────────────
+   La suma de los tres récords paga su propia escalera (post-LEYENDA:
+   MITO · RAYO · EL FERIAL) y el bestiario deriva tasas sin sembrarlas.
+   Semilla: cabrito 1000 + feria 2500 + veterano 500 = 4000 → CAZADOR,
+   faltan 2000 para DIESTRO. Espejo: 6 rebotes / (14+6) cruces = 30%. */
+await page.evaluate(() => {
+  try {
+    localStorage.setItem("vp-volateria-record-cabrito", "1000");
+    localStorage.setItem("vp-volateria-record", "2500"); /* feria */
+    localStorage.setItem("vp-volateria-record-veterano", "500");
+    localStorage.setItem(
+      "vp-archivo",
+      JSON.stringify({
+        partidas: 10, tiros: 100, hits: 40, grazes: 12, jefes: 3,
+        mejorRonda: 7, mejorRacha: 9, maxPuntos: 3200,
+        especie: { espejo: 14, bronce: 20 },
+        perfectas: 2, premios: 1, rebotes: 6, bandas: 4,
+        lastrados: 2, galletas: 5,
+      }),
+    );
+  } catch {}
+});
+await page.reload({ waitUntil: "domcontentloaded" });
+await hasta(
+  page,
+  () => ((window.__labD05Dbg ?? {}).fase === "listo" ? true : null),
+  20000,
+);
+await sleep(900);
+const v80a = await page.evaluate(() =>
+  (document.body.textContent ?? "").replace(/\s+/g, " "),
+);
+check(
+  "v80 — sala: la cuenta larga suma los tres récords (4000 pts · CAZADOR)",
+  v80a.includes("4000 pts") && v80a.includes("CAZADOR"),
+  `chip=${v80a.includes("4000 pts")} rango=${v80a.includes("CAZADOR")}`,
+);
+await page.getByRole("button", { name: /El archivo/ }).click();
+await sleep(700);
+const v80b = await page.evaluate(() =>
+  (document.body.textContent ?? "").replace(/\s+/g, " "),
+);
+check(
+  "v80 — archivo: peldaño honesto (faltan 2000) + tasas de la casa (espejo gana 30%)",
+  v80b.includes("faltan 2000") && v80b.includes("30%"),
+  `peldano=${v80b.includes("faltan 2000")} tasa=${v80b.includes("30%")}`,
+);
+await page.screenshot({ path: `${OUT}08-cuenta-larga.png` });
+await page.getByRole("button", { name: "cerrar" }).click();
+await sleep(500);
 
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });

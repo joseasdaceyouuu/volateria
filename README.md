@@ -11,8 +11,22 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.7.0)
+## La feria (v1.8.0)
 
+- **LA CUENTA LARGA (V80)** — la maestría del cazador que juega la feria
+  entera, no una sola caseta.
+  - **La suma de los tres récords** — CABRITO + FERIA + VETERANO pagan una
+    escalera propia, visible en la sala, en el archivo (con barra de
+    peldaño) y en el cartel del fin, siempre al día (los récords se
+    releen del bolsillo al volver a la sala: cero mentiras tras una
+    tarde con récord).
+  - **Peldaños post-LEYENDA** — la escalera ya no termina en la leyenda:
+    MITO (50.000) · RAYO (90.000) · EL FERIAL (150.000). Ningún modo
+    solo alcanza estos cielos.
+  - **Las tasas de la casa** — el bestiario cuenta en porcentajes: la
+    composición de tu caza (cada especie, su % del total) y las tasas
+    derivadas del archivo — cuántos cruces ganó el espejo, coronas,
+    bandas, galletas y lastrados por tarde. Derivadas, jamás guardadas.
 - **LA FERIA TRUCADA (V79)** — trampas de la casa y engalos del cazador,
   todo telegrafiado: la feria engaña, jamás roba.
   - **LA LÁMPARA QUE SIFA** — desde la ronda 3, la feria apaga las luces
@@ -31,13 +45,17 @@ como proyecto independiente.
     maderas ni cuervos.
 - **Auditoría de diseño aplicada** — el cartel SCROLLEA en pantallas
   bajas (nada pisa ya la firma en móvil), el SONIDO del cartel vive solo
-  en su esquina (había dos) y la pausa ganó su botón ⚙ AJUSTES.
+  en su esquina (había dos) y la pausa ganó su botón ⚙ AJUSTES. V80
+  remata la regla: el FIN y el FANTASMA ya no duplican el botón de
+  sonido (lo da la esquina), y en móvil la esquina queda compacta
+  (icono) sin pisar el título del cartel.
 - **El fantasma de la feria (V78)** — tu mejor Volada del Día del día queda
   grabada tiro a tiro: el cartel ofrece **☾ EL FANTASMA** y la tarde se
   revive sola (mismo cielo sembrado, mismos disparos en el mismo instante).
   El replay bloquea el input y no toca honores: ni récord, ni sello, ni
   podio, ni archivo — solo espectáculo y una cortina propia al terminar.
-- **La escalada (V76)** — rango de maestría por modo (APRENDIZ → LEYENDA) en
+- **La escalada (V76)** — rango de maestría por modo (APRENDIZ → LEYENDA →
+  MITO → RAYO → EL FERIAL, V80) en
   el archivo y en el fin; el podio local: las cinco mejores tardes de cada
   modo (la diaria marca ☀); el bestiario cuenta rebotes del espejo y bandas
   íntegras, y el grid del archivo llega a 12 estatuillas.

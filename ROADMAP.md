@@ -2,9 +2,11 @@
 
 > El tiro al pato de feria, reimaginado: atardecer de lona, zorro cómplice y un cargador que nunca sobra.
 
-## En escena (v1.7.0)
+## En escena (v1.8.0)
 
 Lo que ya luces bajo las bombillas de la feria:
+
+- **LA CUENTA LARGA (V80)** — la maestría del cazador de la feria entera: la suma de los tres récords (CABRITO + FERIA + VETERANO) paga su propia escalera, con barra de peldaño en el archivo y chip vivo en la sala y en el fin. La escalera ya no termina en LEYENDA: **MITO (50.000) · RAYO (90.000) · EL FERIAL (150.000)** — ningún modo solo llega a esos cielos. El bestiario deriva sus tasas sin sembrarlas: composición de la caza en %, cruces con el espejo y cuántos ganó él, coronas/bandas/galletas/lastrados por tarde. Y los récords del cartel se releen del bolsillo al volver a la sala: tras una tarde con récord, cero mentiras. Auditoría de diseño V80: fin y fantasma sin botón de sonido duplicado, y esquina SND compacta en móvil que ya no pisa el título.
 
 - **LA FERIA TRUCADA (V79)** — trampas de la casa y engalos del cazador, todo telegrafiado: **LA LÁMPARA QUE SIFA** apaga las luces a mitad de oleada (zumbido + parpadeo lo anuncian; en el pleno solo los ojos de la presa viva lucen, el cuervo en rojo, y la mira jamás se apaga); **EL PATO LASTRADO** viene con la bola colgante a la vista, se finge muerto al primer toque y resurge con risa de la feria (a la segunda cae del todo — trofeo A LA SEGUNDA); **LA PLANCHA APRIETA** al cierre de cuota (campanita + velocidad ×1.28); y **LA GALLETA DE LA SUERTE**, el globo rosado que perdona un disparo en vacío sin romper la racha (trofeo LA SUERTE EXISTE). El archivo cuenta lastrados y galletas.
 - **Diseño auditado** — el cartel scrollea en pantallas bajas (adiós al solape móvil), un solo botón de sonido en el cartel y ⚙ AJUSTES alcanzable desde la pausa.

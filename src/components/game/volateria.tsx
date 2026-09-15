@@ -23,7 +23,7 @@
      (lección V62), la escribe la sala con cada stats del motor y
      alimenta las sondas QA de scripts/probe.mjs */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameFrame, SoundBtn } from "./game-frame";
 import {
   LETRAS_PREMIO,
@@ -50,6 +50,7 @@ import VolateriaEngine, {
 import {
   TROFEOS,
   comparteRun,
+  cuentaLarga,
   fusionaArchivo,
   guardaArchivo,
   guardaTrofeos,
@@ -61,11 +62,35 @@ import {
   maestriaDe,
   meteEnPodio,
   sellaDiario,
+  tasasDeCasa,
   trofeosGanados,
   type Archivo,
   type PodioRun,
   type Trofeo,
 } from "./meta";
+
+/* V80: los récords de la casa se leen del bolsillo — el cartel cuenta
+   la verdad aunque la tarde acabe de cambiarlos */
+const leeRecords = (): Record<ModoId, number> => {
+  const lee = (k: string) => {
+    try {
+      const v = Number(localStorage.getItem(k));
+      return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+    } catch {
+      return 0;
+    }
+  };
+  return {
+    cabrito: lee(MODOS.cabrito.recordKey),
+    feria: lee(MODOS.feria.recordKey),
+    veterano: lee(MODOS.veterano.recordKey),
+  };
+};
+const RECORDS_VACIOS: Record<ModoId, number> = {
+  cabrito: 0,
+  feria: 0,
+  veterano: 0,
+};
 
 const FASE_INICIAL: VolateriaStats = {
   ok: false,
@@ -129,24 +154,13 @@ export default function Volateria() {
     () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
   const [mounted, setMounted] = useState(false);
-  /* V71: el modo se elige en el cartel y viaja al COMENZAR; los
-     récords de la casa se leen una vez para pintar el selector */
+  /* V71: el modo se elige en el cartel y viaja al COMENZAR; los récords
+     del cartel se leen FRESCOS del bolsillo en cada render de sala (V80:
+     después de una tarde con récord, cero mentiras — sin efectos y sin
+     estado espejo: el render de listo ES la lectura) */
   const [modoSel, setModoSel] = useState<ModoId>("feria");
-  const [records] = useState<Record<ModoId, number>>(() => {
-    const lee = (k: string) => {
-      try {
-        const v = Number(localStorage.getItem(k));
-        return Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
-      } catch {
-        return 0;
-      }
-    };
-    return {
-      cabrito: lee(MODOS.cabrito.recordKey),
-      feria: lee(MODOS.feria.recordKey),
-      veterano: lee(MODOS.veterano.recordKey),
-    };
-  });
+  const records: Record<ModoId, number> =
+    stats.fase === "listo" ? leeRecords() : RECORDS_VACIOS;
 
   useEffect(() => {
     const t = setTimeout(() => setMounted(true), 90);
@@ -337,6 +351,23 @@ export default function Volateria() {
   const enPausa = jugando && stats.pausa;
   /* V76: el rango que consolida esta tarde (para el cartel del fin) */
   const rangoFin = maestriaDe(stats.record);
+  /* V80: LA CUENTA LARGA — la suma de los tres récords, al día. En la
+     sala paga la escalera completa; en el fin, la tarde que cierra. */
+  const cuentaSala = cuentaLarga(records.cabrito, records.feria, records.veterano);
+  const cuentaFin = useMemo(() => {
+    if (stats.fase !== "fin") return null;
+    const r = leeRecords();
+    const m = (stats.modo === "cabrito" || stats.modo === "feria" || stats.modo === "veterano"
+      ? stats.modo
+      : "feria") as ModoId;
+    const act: Record<ModoId, number> = {
+      ...r,
+      [m]: Math.max(r[m] ?? 0, stats.record),
+    };
+    return cuentaLarga(act.cabrito, act.feria, act.veterano);
+  }, [stats.fase, stats.modo, stats.record]);
+  /* V80: LAS TASAS DE LA CASA — el archivo cuenta solo (bestiario en %) */
+  const tCaza = tasasDeCasa(archivo);
   /* entrada escalonada de los carteles (una sola vez, tras el boot) */
   const entra = (delay: string) =>
     `transition-all duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${delay} ${
@@ -628,6 +659,12 @@ export default function Volateria() {
                     </button>
                   ))}
                 </div>
+                {/* V80: LA CUENTA LARGA — la suma de los tres récords paga su
+                   propia escalera; la feria entera cabe en un marcador */}
+                <p className="font-mono text-[9px] uppercase tracking-[0.24em] text-faint/80">
+                  la cuenta larga · {cuentaSala.total} pts ·{" "}
+                  <span className="text-copper">{cuentaSala.nombre}</span>
+                </p>
                 {/* V72: la tarde guardada — CONTINUAR donde quedó */}
                 {runGuardada && runGuardada.ronda > 1 && (
                   <button
@@ -881,8 +918,19 @@ export default function Volateria() {
                 {rangoFin.nombre} en {stats.modo}
                 {rangoFin.proximo !== null
                   ? ` · próximo peldaño: ${rangoFin.proximo} pts`
-                  : " · techo alcanzado"}
+                  : " · techo del modo alcanzado"}
               </p>
+              {/* V80: LA CUENTA LARGA — lo que la suma de los tres récords
+                 acaba de contar (lee los récords frescos del bolsillo) */}
+              {cuentaFin && (
+                <p className="mt-1.5 font-mono text-[9px] uppercase tracking-[0.26em] text-faint/80">
+                  la cuenta larga · {cuentaFin.total} pts ·{" "}
+                  <span className="text-copper">{cuentaFin.nombre}</span>
+                  {cuentaFin.proximo !== null
+                    ? ` · faltan ${cuentaFin.proximo - cuentaFin.total}`
+                    : " · la escalera entera es tuya"}
+                </p>
+              )}
               {stats.recordNuevo && (
                 <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-copper">
                   récord {stats.record} · ronda {stats.ronda}
@@ -920,10 +968,8 @@ export default function Volateria() {
                   <span aria-hidden>✉</span>
                   {shareTxt === "" ? "Compartir" : shareTxt}
                 </button>
-                <SoundBtn
-                  on={!stats.muted}
-                  onToggle={() => apiRef.current?.snd()}
-                />
+                {/* V80: sin SoundBtn aquí — la esquina ya lo da (V79: un solo
+                   botón de sonido por vista; el fin hereda la regla) */}
               </div>
             </div>
           </div>
@@ -964,10 +1010,7 @@ export default function Volateria() {
                     →
                   </span>
                 </button>
-                <SoundBtn
-                  on={!stats.muted}
-                  onToggle={() => apiRef.current?.snd()}
-                />
+                {/* V80: sin SoundBtn — la esquina manda (un solo botón) */}
               </div>
             </div>
           </div>
@@ -993,13 +1036,16 @@ export default function Volateria() {
           </div>
         )}
 
-        {/* SND a mano siempre — la feria también se disfruta muda */}
+        {/* SND a mano siempre — la feria también se disfruta muda.
+           V80: compacto y más abajo en móvil — la esquina ya no pisa
+           el título del cartel (defecto de la auditoría de diseño) */}
         {!jugando && (
           <div
             data-volateria-ui
-            className="absolute right-6 top-20 z-[95] md:top-24"
+            className="absolute right-4 top-14 z-[95] md:right-6 md:top-24"
           >
             <SoundBtn
+              compacto
               on={!stats.muted}
               onToggle={() => apiRef.current?.snd()}
             />
@@ -1101,6 +1147,64 @@ export default function Volateria() {
                     );
                   })}
                 </div>
+                {/* V80: LA CUENTA LARGA — la suma de los tres récords, con su
+                   propio peldaño y su barra. Aquí manda la aritmética: la
+                   escalera no termina en LEYENDA (MITO · RAYO · EL FERIAL). */}
+                {(() => {
+                  const cl = cuentaLarga(
+                    records.cabrito,
+                    records.feria,
+                    records.veterano,
+                  );
+                  const pct =
+                    cl.proximo !== null && cl.proximo > cl.min
+                      ? Math.min(
+                          100,
+                          Math.max(
+                            0,
+                            ((cl.total - cl.min) / (cl.proximo - cl.min)) * 100,
+                          ),
+                        )
+                      : 100;
+                  return (
+                    <div className="mt-4 border border-copper/40 bg-[#0d0c0a] px-3.5 py-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
+                          La cuenta larga — la suma de los tres récords
+                        </p>
+                      </div>
+                      <div className="mt-2 flex items-baseline justify-between gap-3">
+                        <p className="font-mono text-xl font-semibold tabular-nums text-cream">
+                          {cl.total}
+                          <span className="ml-1 font-mono text-[9px] uppercase tracking-[0.2em] text-faint">
+                            pts
+                          </span>
+                        </p>
+                        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-copper">
+                          {cl.nombre}
+                        </p>
+                      </div>
+                      <div
+                        role="progressbar"
+                        aria-label="Progreso hacia el próximo peldaño de la cuenta larga"
+                        aria-valuenow={Math.round(pct)}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        className="mt-2.5 h-1 w-full overflow-hidden rounded-full bg-line/40"
+                      >
+                        <div
+                          className="h-full rounded-full bg-copper transition-all duration-700"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <p className="mt-1.5 font-mono text-[8px] uppercase tracking-[0.18em] text-faint/70">
+                        {cl.proximo !== null
+                          ? `próximo peldaño ${cl.proximo} — faltan ${cl.proximo - cl.total}`
+                          : "la escalera entera es tuya — EL FERIAL pagado"}
+                      </p>
+                    </div>
+                  );
+                })()}
                 {/* V76: EL PODIO — las 5 mejores tardes del modo */}
                 <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
                   El podio — las cinco mejores tardes
@@ -1145,6 +1249,8 @@ export default function Volateria() {
                     ))
                   )}
                 </div>
+                {/* V80: el bestiario ahora cuenta en porcentajes — la
+                   composición de la caza de toda la vida */}
                 <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
                   El bestiario — lo cazado en toda la historia
                 </p>
@@ -1163,17 +1269,66 @@ export default function Volateria() {
                       "senuelo",
                       "cuervo",
                     ] as const
-                  ).map((t) => (
-                    <span
-                      key={t}
-                      className={`rounded-sm border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] ${
-                        (archivo.especie[t] ?? 0) > 0
-                          ? "border-copper/60 text-copper"
-                          : "border-line/60 text-faint/50"
-                      }`}
+                  ).map((t) => {
+                    const n = archivo.especie[t] ?? 0;
+                    const p =
+                      tCaza.totalCazado > 0 && n > 0
+                        ? Math.round((n / tCaza.totalCazado) * 100)
+                        : null;
+                    return (
+                      <span
+                        key={t}
+                        className={`rounded-sm border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] ${
+                          n > 0
+                            ? "border-copper/60 text-copper"
+                            : "border-line/60 text-faint/50"
+                        }`}
+                      >
+                        {t} {n > 0 ? `×${n}${p !== null ? ` · ${p}%` : ""}` : "·"}
+                      </span>
+                    );
+                  })}
+                </div>
+                {/* V80: LAS TASAS DE LA CASA — derivadas del archivo, jamás
+                   guardadas: los porcentajes se calculan, no se siembran */}
+                <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
+                  Las tasas de la casa — la historia en porcentajes
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {[
+                    ["cruces con el espejo", String(tCaza.crucesEspejo)],
+                    [
+                      "el espejo gana",
+                      tCaza.espejoGana !== null ? `${tCaza.espejoGana}%` : "—",
+                    ],
+                    [
+                      "coronas por tarde",
+                      tCaza.coronas !== null ? `${tCaza.coronas}` : "—",
+                    ],
+                    [
+                      "bandas íntegras por tarde",
+                      tCaza.bandas !== null ? `${tCaza.bandas}` : "—",
+                    ],
+                    [
+                      "galletas por tarde",
+                      tCaza.galletas !== null ? `${tCaza.galletas}` : "—",
+                    ],
+                    [
+                      "lastrados por tarde",
+                      tCaza.lastrados !== null ? `${tCaza.lastrados}` : "—",
+                    ],
+                  ].map(([k, v]) => (
+                    <div
+                      key={k}
+                      className="border border-line/60 bg-[#0d0c0a] px-3 py-2.5"
                     >
-                      {t} {(archivo.especie[t] ?? 0) > 0 ? `×${archivo.especie[t]}` : "·"}
-                    </span>
+                      <p className="font-mono text-[8px] uppercase tracking-[0.22em] text-faint">
+                        {k}
+                      </p>
+                      <p className="mt-1 font-mono text-lg font-semibold tabular-nums text-cream">
+                        {v}
+                      </p>
+                    </div>
                   ))}
                 </div>
                 <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">

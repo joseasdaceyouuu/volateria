@@ -34,29 +34,40 @@ function CornerTick({ at }: { at: Corner }) {
   );
 }
 
-/* botón SND — arma el motor de audio dentro del gesto */
+/* botón SND — arma el motor de audio dentro del gesto.
+   V80: compacto — en pantallas angostas queda en icono (la esquina no
+   pisa ya el título del cartel; el nombre sigue para el lector de
+   pantalla vía aria-label) */
 export function SoundBtn({
   on,
   onToggle,
+  compacto = false,
 }: {
   on: boolean;
   onToggle: () => void;
+  compacto?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={on}
-      className={`rounded-full border px-4 py-2 font-mono text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm transition-colors duration-300 ${
+      aria-label="Sonido"
+      className={`rounded-full border font-mono text-[10px] uppercase tracking-[0.2em] backdrop-blur-sm transition-colors duration-300 ${
+        compacto ? "px-2.5 py-2" : "px-4 py-2"
+      } ${
         on
           ? "border-copper/70 bg-copper/10 text-copper"
           : "border-line bg-ink/60 text-smoke hover:border-copper/70 hover:text-copper"
       }`}
     >
-      <span aria-hidden className="mr-2 inline-block">
+      <span
+        aria-hidden
+        className={`inline-block ${compacto ? "md:mr-2" : "mr-2"}`}
+      >
         {on ? "◉" : "○"}
       </span>
-      Sonido
+      <span className={compacto ? "hidden md:inline" : ""}>Sonido</span>
     </button>
   );
 }

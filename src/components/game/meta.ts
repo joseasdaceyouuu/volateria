@@ -165,13 +165,19 @@ export const fusionaArchivo = (a: Archivo, s: VolateriaStats): Archivo => ({
   galletas: a.galletas + s.galletas,
 });
 
-/* ── V76: LA ESCALADA — el rango de maestría que paga cada récord ── */
+/* ── V76: LA ESCALADA — el rango de maestría que paga cada récord.
+   V80: peldaños post-LEYENDA — la escalera no termina en la leyenda.
+   MITO y RAYO son para el cazador de verdad; EL FERIAL solo lo paga
+   LA CUENTA LARGA (la suma de los tres récords). ── */
 export const ESCALERA_MAESTRIA = [
   { min: 0, nombre: "APRENDIZ" },
   { min: 2500, nombre: "CAZADOR" },
   { min: 6000, nombre: "DIESTRO" },
   { min: 12000, nombre: "MAESTRO" },
   { min: 25000, nombre: "LEYENDA" },
+  { min: 50000, nombre: "MITO" },
+  { min: 90000, nombre: "RAYO" },
+  { min: 150000, nombre: "EL FERIAL" },
 ] as const;
 
 export const maestriaDe = (
@@ -185,6 +191,39 @@ export const maestriaDe = (
   const actual = ESCALERA_MAESTRIA[i];
   const proximo = ESCALERA_MAESTRIA[i + 1] ?? null;
   return { nombre: actual.nombre, min: actual.min, proximo: proximo?.min ?? null };
+};
+
+/* ── V80: LA CUENTA LARGA — la maestría que paga la SUMA de los tres
+   récords. Ningún modo solo alcanza estos cielos: es el marcador del
+   cazador que juega la feria entera, no una sola caseta. ── */
+export const cuentaLarga = (
+  cabrito: number,
+  feria: number,
+  veterano: number,
+): { total: number; nombre: string; min: number; proximo: number | null } => {
+  const s = (n: number) =>
+    Number.isFinite(n) ? Math.max(0, Math.floor(n)) : 0;
+  const total = s(cabrito) + s(feria) + s(veterano);
+  return { total, ...maestriaDe(total) };
+};
+
+/* ── V80: LAS TASAS DE LA CASA — lo que el archivo sabe contar solo.
+   Derivadas, jamás guardadas: un porcentaje no ocupa memoria. ── */
+export const tasasDeCasa = (a: Archivo) => {
+  const espejo = a.especie.espejo ?? 0;
+  const cruces = espejo + a.rebotes; // todo cruce con el espejo, ganado o devuelto
+  const porTarde = (n: number): number | null =>
+    a.partidas > 0 ? Math.round((n / a.partidas) * 10) / 10 : null;
+  return {
+    crucesEspejo: cruces,
+    espejoGana: cruces > 0 ? Math.round((a.rebotes / cruces) * 100) : null,
+    bandas: porTarde(a.bandas),
+    galletas: porTarde(a.galletas),
+    lastrados: porTarde(a.lastrados),
+    premios: porTarde(a.premios),
+    coronas: porTarde(a.jefes),
+    totalCazado: Object.values(a.especie).reduce((x, y) => x + y, 0),
+  };
 };
 
 /* ── V76: EL PODIO — las 5 mejores tardes de cada modo ── */
