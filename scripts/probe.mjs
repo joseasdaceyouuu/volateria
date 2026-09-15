@@ -41,7 +41,8 @@ let pass = 0;
 let fail = 0;
 function check(name, ok, detail = "") {
   console.log(`${ok ? "PASS" : "FAIL"}  ${name}${detail ? "  — " + detail : ""}`);
-  ok ? pass++ : fail++;
+  if (ok) pass++;
+  else fail++;
 }
 
 /* espera condicionada — la feria corre a dt de SwiftShader en local */
@@ -732,6 +733,104 @@ check(
 await page.screenshot({ path: `${OUT}08-cuenta-larga.png` });
 await page.getByRole("button", { name: "cerrar" }).click();
 await sleep(500);
+
+/* ── 8j · V81 — LA FUGA AVISADA ──────────────────────────────────
+   La Bandada Real se comporta honesta: caer las TRES coronas cierra
+   la ronda y jefes cuenta UNA (antes contaba tres — regresión V75);
+   la telemetría trae el sello errático (err) en cada pato; y el fin
+   EXPLICA la tarde (motivoFin con la cuota). Semilla fija 42/42. */
+await page.evaluate(() => {
+  try {
+    localStorage.setItem(
+      "vp-run",
+      JSON.stringify({
+        v: 2, ronda: 8, puntos: 5000, racha: 0, hits: 0, escapes: 0,
+        tiros: 0, letras: "", modo: "feria", diaria: false,
+        semilla: 42, estado: 42,
+      }),
+    );
+  } catch {}
+});
+await page.reload({ waitUntil: "domcontentloaded" });
+await sleep(4200);
+await page.getByRole("button", { name: /Continuar/ }).click();
+await sleep(1500);
+const coronas81 = await hasta(
+  page,
+  () => {
+    const d = window.__labD05Dbg ?? {};
+    const cs = (d.patos ?? []).filter((q) => q.tipo === "real" && q.viva);
+    return cs.length >= 3 ? cs.map((q) => q.id) : null;
+  },
+  30000,
+  200,
+);
+check(
+  "v81 — bandada real: tres coronas en vuelo",
+  Array.isArray(coronas81) && coronas81.length === 3,
+  JSON.stringify(coronas81),
+);
+check(
+  "v81 — contrato errático: campo err presente en telemetría de patos",
+  (await page.evaluate(
+    () =>
+      (window.__labD05Dbg?.patos ?? []).length > 0 &&
+      (window.__labD05Dbg?.patos ?? []).every((q) => "err" in q),
+  )) === true,
+);
+let cierre81 = null;
+if (Array.isArray(coronas81)) {
+  const plazo81 = Date.now() + 110000;
+  while (Date.now() < plazo81) {
+    const st = await page.evaluate(() => {
+      const d = window.__labD05Dbg ?? {};
+      const c = (d.patos ?? []).find((q) => q.tipo === "real" && q.viva);
+      return {
+        c: c ? { x: c.x, y: c.y } : null,
+        ronda: d.ronda ?? 0,
+        fase: d.fase ?? "",
+        jefes: d.jefes ?? -1,
+        balas: d.balas ?? 0,
+      };
+    });
+    if (st.ronda >= 9) {
+      cierre81 = { ok: true, jefes: st.jefes };
+      break;
+    }
+    if (st.fase !== "jugando") {
+      cierre81 = { ok: false, fase: st.fase };
+      break;
+    }
+    if (!st.c) {
+      await sleep(250);
+      continue;
+    }
+    if (st.balas <= 0) await page.keyboard.press("r");
+    else await page.mouse.click(st.c.x * 1440, st.c.y * 900);
+    await sleep(330);
+  }
+}
+check(
+  "v81 — las tres coronas caen y la ronda AVANZA (ronda 9 · jefes=1)",
+  !!cierre81 && cierre81.ok === true && cierre81.jefes === 1,
+  JSON.stringify(cierre81),
+);
+await page.screenshot({ path: `${OUT}09-fuga-avisada.png` });
+/* el motivo del fin: soltar la volada de la ronda 9 y dejar que cierre */
+const motivo81 = await hasta(
+  page,
+  () => {
+    const d = window.__labD05Dbg ?? {};
+    return d.fase === "fin" && d.motivoFin ? d.motivoFin : null;
+  },
+  60000,
+  500,
+);
+check(
+  "v81 — el fin EXPLICA la tarde (motivoFin nombra la cuota)",
+  typeof motivo81 === "string" && /volada entera escap|cuota corta/.test(motivo81),
+  JSON.stringify(motivo81),
+);
 
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });

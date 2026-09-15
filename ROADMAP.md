@@ -2,9 +2,11 @@
 
 > El tiro al pato de feria, reimaginado: atardecer de lona, zorro cómplice y un cargador que nunca sobra.
 
-## En escena (v1.8.0)
+## En escena (v1.9.0)
 
 Lo que ya luces bajo las bombillas de la feria:
+
+- **LA FUGA AVISADA (V81)** — la fuga se ve venir y el fin se explica: las coronas de la Bandada Real arden en oro a 5 s de irse ("¡la corona se escapa!"), cada impacto les devuelve reloj, el telegráfo de fuga de toda la volada destella 2 s, la banda silvestre sin dueño se esparce al cielo en vez de orbitar eterna, el cartel del fin CANTA el motivo ("cuota corta: 3 de 5"), zafiro/espejo/mensajero vuelan con jalones impredecibles desde la ronda 3, y jefes vuelve a contar UNA corona por bandada (regresión V75 cerrada).
 
 - **LA CUENTA LARGA (V80)** — la maestría del cazador de la feria entera: la suma de los tres récords (CABRITO + FERIA + VETERANO) paga su propia escalera, con barra de peldaño en el archivo y chip vivo en la sala y en el fin. La escalera ya no termina en LEYENDA: **MITO (50.000) · RAYO (90.000) · EL FERIAL (150.000)** — ningún modo solo llega a esos cielos. El bestiario deriva sus tasas sin sembrarlas: composición de la caza en %, cruces con el espejo y cuántos ganó él, coronas/bandas/galletas/lastrados por tarde. Y los récords del cartel se releen del bolsillo al volver a la sala: tras una tarde con récord, cero mentiras. Auditoría de diseño V80: fin y fantasma sin botón de sonido duplicado, y esquina SND compacta en móvil que ya no pisa el título.
 

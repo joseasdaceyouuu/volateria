@@ -11,8 +11,30 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.8.0)
+## La feria (v1.9.0)
 
+- **LA FUGA AVISADA (V81)** — el fin de la feria ya no pilla a nadie: la
+  fuga se VE venir y el final se EXPLICA solo.
+  - **Las coronas avisan** — la Bandada Real arde en un anillo de oro a
+    5 s de irse y la feria lo grita ("¡la corona se escapa!"); cada
+    impacto le devuelve tiempo al reloj: mientras la trabajes, no vuela.
+    Adiós al ave que daba vueltas "inmatable": era la corona escapando
+    sin aviso, con 0,75 s de destello y sin explicación.
+  - **El telegráfo de fuga honesto** — toda la volada destella 2 s
+    antes de irse (antes 0,75 s, solo sonido).
+  - **La banda silvestre respeta el reloj** — si nadie la caza, se
+    esparce al cielo (~16 s) en vez de orbitar la feria para siempre.
+  - **El fin se explica** — el cartel del fin dice POR QUÉ se acabó la
+    tarde: "cuota corta: 3 de 5" o "la volada entera escapó sin plomo ·
+    pedía 8". El juego se acaba cuando una volada cierra sin llegar a
+    la cuota — y ahora el cartel lo canta.
+  - **VUELOS IMPREDECIBLES** — desde la ronda 3, zafiro, espejo y
+    mensajero vuelan con jalones bruscos que no se dejan leer (un
+    destello de una frame es el aviso justo): la feria tiene carácter.
+  - **Cuenta honesta** — jefes contaba TRES coronas por bandada
+    (regresión del V75): ahora una bandada, un jefe. Y el lint quedó a
+    cero con la regla estricta de react-hooks (archivo y fantasma sin
+    setState en efectos).
 - **LA CUENTA LARGA (V80)** — la maestría del cazador que juega la feria
   entera, no una sola caseta.
   - **La suma de los tres récords** — CABRITO + FERIA + VETERANO pagan una

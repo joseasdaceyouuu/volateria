@@ -34,6 +34,7 @@ export type Especie = {
   popup: string; // color del popup de puntos
   hp: number; // impactos que aguanta
   cebo: boolean; // ¡NO DISPARES!
+  erratico: boolean; // V81: vuelo con jalones bruscos impredecibles
 };
 
 export const ESPECIES: Record<TipoPato, Especie> = {
@@ -50,6 +51,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#e8c793",
     hp: 1,
     cebo: false,
+    erratico: false,
   },
   zafiro: {
     cuerpo0: "#3d827a",
@@ -64,6 +66,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#8fe6d8",
     hp: 1,
     cebo: false,
+    erratico: true, // V81: el zafiro vuela como si le persiguieran
   },
   dorada: {
     cuerpo0: "#d4ab55",
@@ -78,6 +81,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#ffe9b0",
     hp: 1,
     cebo: false,
+    erratico: false,
   },
   humo: {
     cuerpo0: "#7d7390",
@@ -92,6 +96,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#c9bfe6",
     hp: 1,
     cebo: false,
+    erratico: false,
   },
   acorazado: {
     cuerpo0: "#8d9099",
@@ -106,6 +111,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#d7dbe2",
     hp: 2,
     cebo: false,
+    erratico: false,
   },
   /* EL PATO REAL — la corona de la feria (V68): cada cuatro rondas
      baja a exigir tributo. Fases: escolta al 70%, FURIA al 40% */
@@ -122,6 +128,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#ffe9b0",
     hp: 7,
     cebo: false,
+    erratico: false,
   },
   senuelo: {
     cuerpo0: "#8a5a2c",
@@ -136,6 +143,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#e0b184",
     hp: 1,
     cebo: true,
+    erratico: false,
   },
   cuervo: {
     cuerpo0: "#221f26",
@@ -150,6 +158,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#b9b3c9",
     hp: 1,
     cebo: true,
+    erratico: false,
   },
   /* V71 — el ESPEJO: plateado y vanidoso, a veces el plomo rebota */
   espejo: {
@@ -165,6 +174,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#dfe4ee",
     hp: 1,
     cebo: false,
+    erratico: true, // V81: el vanidoso se mueve como se le antoja
   },
   /* V71 — la BANDA: mini patos que vuelan en formación cerrada;
      al guía se le cae TODA la bandada encima */
@@ -181,6 +191,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#f2c08c",
     hp: 1,
     cebo: false,
+    erratico: false,
   },
   /* V71 — el MENSAJERO: verde y manso, trae una letra del PREMIO */
   mensajero: {
@@ -196,6 +207,7 @@ export const ESPECIES: Record<TipoPato, Especie> = {
     popup: "#cfe3a0",
     hp: 1,
     cebo: false,
+    erratico: true, // V81: el mensajero esquiva para conservar su letra
   },
 };
 

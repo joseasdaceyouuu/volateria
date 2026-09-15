@@ -173,6 +173,7 @@ export type PatoTelemetria = {
   cebo: boolean; // ¡NO DISPARES! señuelo o cuervo
   lastrado?: boolean; // V79: lleva plomo falso — pide DOS toques
   est?: string; // V79: vuelo · caida · suelto · fuga (QA del teatro)
+  err?: boolean; // V81: vuelo errático (jalones impredecibles)
 };
 
 export type GloboTelemetria = { x: number; y: number; poder: string };
@@ -226,6 +227,7 @@ export type VolateriaStats = {
   galleta: boolean; // V79: ¿llevas la galleta de la suerte puesta?
   apagon: boolean; // V79: LA LÁMPARA QUE SIFA está (o llega) en escena
   plancha: boolean; // V79: LA PLANCHA APRIETA (cierre de cuota veloz)
+  motivoFin: string; // V81: la feria explica por qué se cerró la tarde
   porEspecie: Record<string, number>; // cazados por especie (V72)
   patos: PatoTelemetria[];
 };
@@ -312,6 +314,8 @@ type Pato = {
   /* V79: LA FERIA TRUCADA */
   lastrado?: boolean; // lleva plomo falso: se finge muerto al primer toque
   teatro?: boolean; // en caída teatral — RESURGE a mitad de vuelo
+  erratico?: boolean; // V81: zafiro/espejo/mensajero — jalones bruscos
+  jinkCd?: number; // V81: reloj hasta el próximo jalón errático
 };
 
 type Pluma = {
@@ -450,6 +454,7 @@ function VolateriaEngine({
     let pendiente = 0; // patos de la oleada sin resolver
     let plan: number[] = [];
     let cerrarVuelta = false;
+    let motivoFin = ""; // V81: el motivo del fin, contado en el cartel
     let spawnT = 0;
     let res: string[] = [];
     let quackT = 200;
@@ -588,6 +593,7 @@ function VolateriaEngine({
         galleta,
         apagon: apagonT > 0,
         plancha,
+        motivoFin,
         porEspecie: { ...porEspecie },
         enCola: Math.max(0, VOLADA - lanzados),
         resultados: res.slice(),
@@ -615,6 +621,7 @@ function VolateriaEngine({
           tipo: p.tipo,
           cebo: ESPECIES[p.tipo].cebo,
           lastrado: !!p.lastrado,
+          err: !!p.erratico,
           est: p.estado,
         })),
       });
@@ -880,6 +887,10 @@ function VolateriaEngine({
         flashT: 0,
         lastrado: lastr,
         teatro: false,
+        /* V81: desde la ronda 3, zafiro/espejo/mensajero vuelan con
+           jalones que no se pueden leer — la feria tiene carácter */
+        erratico: r >= 3 && E.erratico,
+        jinkCd: 30 + rng() * 60,
       };
       if (lastr) {
         nuevo.vx *= 0.85; // cargado: más lento ybalanceante
@@ -1016,7 +1027,10 @@ function VolateriaEngine({
           fadeT: 0,
           targetY: y0,
           retargetT: 1e9,
-          escapeT: 1e9,
+          /* V81: la banda silvestre respeta el reloj de la feria — si
+             nadie la caza, se va al cielo (~16 s) en vez de dar vueltas
+             eternas rebotando de borde en borde */
+          escapeT: 900 + rng() * 240,
           evadeCd: 1e9,
           fintaT: 0,
           fintaCd: 1e9,
@@ -1327,6 +1341,9 @@ function VolateriaEngine({
         p.flashT = 3;
         p.ivx += (p.x < xp ? -1 : 1) * 4.2;
         p.ivy -= 1.4;
+        /* V81: el plomo SOSTIENE la corona — mientras la trabajes no
+           se escapa; cada impacto le devuelve tiempo (260f ≈ 4 s) */
+        p.escapeT = Math.max(p.escapeT, 260);
         freezeT = reduced ? 0 : 4;
         sacude(6);
         vibra(12);
@@ -1594,8 +1611,9 @@ function VolateriaEngine({
           vibra([30, 30, 30, 30, 90]);
           audio.corona();
         } else {
+          /* V81: jefesRun SOLO cuando cae la ÚLTIMA corona — antes
+             contaba tres jefes por bandada (regresión del V75) */
           audio.tinc();
-          jefesRun++;
           vibra(20);
         }
         return;
@@ -2076,6 +2094,13 @@ function VolateriaEngine({
 
     const finDelJuego = () => {
       fase = "fin";
+      /* V81: la feria EXPLICA el final — se acaba el juego cuando una
+         volada cierra sin llegar a la cuota, y se dice cuánta quedó */
+      const cuFin = cuotaModo(Math.max(1, ronda), modo);
+      motivoFin =
+        volleyHits <= 0
+          ? `la volada entera escapó sin plomo · pedía ${cuFin}`
+          : `cuota corta: ${volleyHits} de ${cuFin} · así acaba la tarde`;
       /* V78: revivir la tarde no concede honores ni borra la run real
          que el cazador tenga guardada — el fantasma solo mira */
       recordNuevo = !replayActivo && puntos > record;
@@ -2261,6 +2286,7 @@ function VolateriaEngine({
       bandasRun = 0;
       perfectasSeguidas = 0;
       /* V79: la feria trucada arranca limpia en cada tarde */
+      motivoFin = "";
       lastradosRun = 0;
       galletasRun = 0;
       galleta = false;
@@ -2476,6 +2502,15 @@ function VolateriaEngine({
               p.x += (p.vx + vientoF * 0.8) * dtD;
               p.y += Math.sin(p.t * 0.2 + p.fase0) * 1.1 * dtD;
             }
+            /* V81: el reloj corre también sin guía — la banda nerviosa
+               se esparce al cielo en vez de orbitar para siempre */
+            p.escapeT -= dtD;
+            if (p.escapeT <= 0) {
+              p.estado = "fuga";
+              p.vy = -2.2;
+              emit();
+              continue;
+            }
             if (p.x < -110 || p.x > w + 110) {
               patos.splice(i, 1);
               emit();
@@ -2683,6 +2718,19 @@ function VolateriaEngine({
                 }
               }
             }
+            /* V81: VUELOS IMPREDECIBLES — zafiro, espejo y mensajero
+               juegan a lo suyo: jalones bruscos que no se dejan leer.
+               El destello de una frame es el aviso justo; el tiempo
+               lento los dobla igual que a cualquiera */
+            if (p.erratico && p.fintaT <= 0) {
+              p.jinkCd = (p.jinkCd ?? 40) - dtD;
+              if (p.jinkCd <= 0) {
+                p.ivx += (rng() - 0.5) * 5.2;
+                p.ivy += (rng() - 0.5) * 3.6 - 0.5;
+                p.jinkCd = 34 + rng() * 66;
+                p.flashT = Math.max(p.flashT, 1);
+              }
+            }
             /* la volada se acaba: se escapa hacia el cielo */
             const preEsc = p.escapeT;
             p.escapeT -= dtD;
@@ -2696,6 +2744,26 @@ function VolateriaEngine({
               p.idx < VOLADA
             )
               audio.aviso();
+            /* V81: LA FUGA AVISADA — las coronas lo gritan TEMPRANO:
+               a 5 s de irse, la feria lo canta. Nada de aves inmatables:
+               la huida se ve venir y el plomo veloz la alcanza */
+            if (
+              p.tipo === "real" &&
+              preEsc > 300 &&
+              p.escapeT <= 300 &&
+              p.escapeT > 0
+            ) {
+              audio.aviso();
+              popups.push({
+                x: Math.min(w - 90, Math.max(90, p.x)),
+                y: Math.max(96, p.y - 46 * p.scale * 0.6),
+                txt: "¡la corona se escapa!",
+                t: 0,
+                vida: 80,
+                color: "#ffe9b0",
+                serif: true,
+              });
+            }
             if (p.escapeT <= 0) {
               p.estado = "fuga";
               p.vy = -2.4;
@@ -3257,14 +3325,16 @@ function VolateriaEngine({
         c.fill();
         c.globalAlpha = 1;
       }
-      /* TELEGRÁFO DE FUGA (V68) — destello cremoso: ¡se va, dispárale! */
+      /* TELEGRÁFO DE FUGA (V68) — destello cremoso: ¡se va, dispárale!
+         V81: ventana honesta (2 s) y las coronas ARDEN EN ORO desde
+         los 5 s — la fuga se ve venir, jamás se sufre */
       if (
         p.estado === "vuelo" &&
         p.idx >= 0 &&
         p.idx < VOLADA &&
         p.patron !== "poste" &&
         p.escapeT > 0 &&
-        p.escapeT < 45
+        p.escapeT < 130
       ) {
         const bl = 0.5 + 0.5 * Math.sin(p.t * 0.55);
         c.globalAlpha = 0.4 + 0.5 * bl;
@@ -3275,6 +3345,23 @@ function VolateriaEngine({
         c.lineTo(-5.5, -37);
         c.closePath();
         c.fill();
+        c.globalAlpha = 1;
+      }
+      /* V81: el anillo de oro de la corona — avisa del reloj de fuga
+         mientras esté por agotarse (los impactos lo sostienen) */
+      if (
+        p.estado === "vuelo" &&
+        p.tipo === "real" &&
+        p.escapeT > 0 &&
+        p.escapeT < 320
+      ) {
+        const bl = 0.5 + 0.5 * Math.sin(p.t * 0.28);
+        c.globalAlpha = 0.26 + 0.34 * bl;
+        c.strokeStyle = "#ffe9b0";
+        c.lineWidth = 2.5;
+        c.beginPath();
+        c.arc(0, 0, 40, 0, 6.2832);
+        c.stroke();
         c.globalAlpha = 1;
       }
       c.restore();
@@ -3889,8 +3976,6 @@ function VolateriaEngine({
       if (apiRef) apiRef.current = null;
       if (gl && prog) gl.deleteProgram(prog);
     };
-    /* los refs de la sala (api/onStats) son estables */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

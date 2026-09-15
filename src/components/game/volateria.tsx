@@ -141,6 +141,7 @@ const FASE_INICIAL: VolateriaStats = {
   galleta: false,
   apagon: false,
   plancha: false,
+  motivoFin: "",
   porEspecie: {},
   patos: [],
 };
@@ -171,7 +172,12 @@ export default function Volateria() {
   const [runGuardada] = useState(() => leeRun());
   const [sello] = useState(() => leeSelloDiario());
   const [archivoAbierto, setArchivoAbierto] = useState(false);
-  const [archivo, setArchivo] = useState<Archivo>(() => leeArchivo());
+  /* V81: el archivo se lee FRESCO del bolsillo — al abrir el panel y
+     en cada cierre de tarde (sin setState en efectos, regla react-hooks) */
+  const archivo = useMemo<Archivo>(
+    () => leeArchivo(),
+    [stats.fase, stats.puntos, archivoAbierto],
+  );
   /* V76: el podio — se lee fresco del bolsillo al abrir el archivo */
   const [podioVista, setPodioVista] = useState<Record<string, PodioRun[]>>(
     () => leePodio(),
@@ -225,6 +231,8 @@ export default function Volateria() {
      si su tarde fue la mejor del día */
   const mergeRef = useRef("");
   useEffect(() => {
+    /* V81: los aplazados del fin — setState diferido fuera del efecto */
+    const relojes: ReturnType<typeof setTimeout>[] = [];
     if (stats.fase !== "fin") return;
     if (stats.replay) return;
     const sig = `${stats.puntos}-${stats.tiros}-${stats.ronda}-${stats.diaria}`;
@@ -232,7 +240,6 @@ export default function Volateria() {
     mergeRef.current = sig;
     const fus = fusionaArchivo(leeArchivo(), stats);
     guardaArchivo(fus);
-    setArchivo(fus);
     /* V76: el podio recoge la tarde si dejó puntos en el plato */
     if (stats.puntos > 0) {
       const d = new Date();
@@ -256,13 +263,20 @@ export default function Volateria() {
           ronda: stats.ronda,
           eventos: evs.eventos,
         };
-        if (guardaFantasma(f)) setFantasmaHoy(f);
+        /* V81: el relevo se aplaza un latido — el setState vive fuera
+           del cuerpo síncrono del efecto (regla react-hooks) */
+        relojes.push(
+          setTimeout(() => {
+            if (guardaFantasma(f)) setFantasmaHoy(f);
+          }, 0),
+        );
       }
     }
     /* V77: la guía se despide para siempre en la primera tarde cerrada */
     try {
       localStorage.setItem("vp-guia", "1");
     } catch {}
+    return () => relojes.forEach(clearTimeout);
   }, [stats.fase, stats]);
 
   /* el toast se despide solo */
@@ -329,6 +343,7 @@ export default function Volateria() {
       galleta: stats.galleta,
       apagon: stats.apagon,
       plancha: stats.plancha,
+      motivoFin: stats.motivoFin,
       porEspecie: stats.porEspecie,
       patos: stats.patos,
     };
@@ -600,7 +615,7 @@ export default function Volateria() {
                   },
                   {
                     k: "Dispara",
-                    d: "3 balas por pato · R recarga · la cuota crece cada dos rondas",
+                    d: "3 balas por pato · R recarga · llena la cuota o la tarde se acaba",
                   },
                   {
                     k: "Desconfía",
@@ -800,7 +815,7 @@ export default function Volateria() {
               className="pointer-events-none absolute bottom-28 left-1/2 z-[93] max-w-[86vw] -translate-x-1/2 rounded-full border border-line/70 bg-ink/70 px-5 py-2 text-center font-mono text-[9px] uppercase tracking-[0.22em] text-smoke backdrop-blur-sm md:bottom-24"
             >
               {stats.hits >= 1
-                ? "R recarga · llena la cuota y la ronda crece"
+                ? "R recarga · llena la cuota · la tarde acaba si la cuota queda corta"
                 : stats.tiros >= 1
                   ? "cuidado: hay señuelos y cuervos que cobran plomo"
                   : "la mira vive en tu cursor — apunta y dispara"}
@@ -913,6 +928,12 @@ export default function Volateria() {
                   ? "el zorro no va a olvidar esta tarde — nuevo récord"
                   : `ronda ${stats.ronda} · récord ${stats.record}`}
               </p>
+              {/* V81: la feria explica el final — cuándo se acaba y por qué */}
+              {stats.motivoFin && (
+                <p className="mt-1.5 font-serif text-[13px] italic text-cream/55">
+                  {stats.motivoFin}
+                </p>
+              )}
               {/* V76: el rango que esta tarde consolida */}
               <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-copper">
                 {rangoFin.nombre} en {stats.modo}
