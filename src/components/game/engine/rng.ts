@@ -10,15 +10,27 @@
 
 export type Rng = () => number;
 
-export function mulberry32(seed: number): Rng {
+/* V75: el rng sabe recordar dónde estaba — CONTINUAR restaura el
+   estado exacto y la tarde guardada sigue el mismo cielo */
+export type RngEstado = Rng & {
+  estado: () => number;
+  restaura: (a: number) => void;
+};
+
+export function mulberry32(seed: number): RngEstado {
   let a = seed >>> 0;
-  return () => {
+  const f = (() => {
     a = (a + 0x6d2b79f5) >>> 0;
     let t = a;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }) as RngEstado;
+  f.estado = () => a;
+  f.restaura = (s: number) => {
+    a = s >>> 0;
   };
+  return f;
 }
 
 /* FNV-1a — textos → 32 bits para semillas legibles */
@@ -31,8 +43,9 @@ export const hashStr = (s: string): number => {
   return h >>> 0;
 };
 
-/* la semilla del día — cambia a medianoche LOCAL del visitante */
+/* la semilla del día — medianoche UTC (V75): la MISMA feria para
+   todo el planeta, sin importar la franja horaria del visitante */
 export const semillaDelDia = (d = new Date()): number =>
   hashStr(
-    `volateria-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
+    `volateria-${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`,
   );

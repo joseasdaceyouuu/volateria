@@ -10,7 +10,16 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.2.0)
+## La feria (v1.3.0)
+
+- **La feria calibrada (V75)** — la Volada del Día ahora es de verdad
+  planetaria: semilla por medianoche UTC, SIEMPRE en modo FERIA, un solo
+  sello por día (el PRIMER intento manda, estilo Wordle) y la tarde
+  recuperable restaura su semilla exacta: CONTINUAR repite el mismo cielo.
+- **Puerta de vuelta** — botón CARTEL en la pausa y en el fin: ajustes,
+  archivo y continuar sin recargar la feria.
+- **Puntos honestos** — las rondas de jefe ya no regalan la volada perfecta
+  (cobran su botín propio) y la última corona de la Bandada Real sí cuenta.
 
 - **Tres modos** — CABRITO (5 balas, cuota−1), FERIA (la casa manda) y
   VETERANO (2 balas, cuota+1, ×1.15): cada uno con su récord.

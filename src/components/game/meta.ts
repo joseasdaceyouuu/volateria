@@ -18,7 +18,10 @@ export const leeRun = (): RunSnapshot | null => {
     const raw = localStorage.getItem(RUN_KEY);
     if (!raw) return null;
     const s = JSON.parse(raw) as RunSnapshot;
-    return s && s.v === 1 && Number.isFinite(s.ronda) ? s : null;
+    /* v1 (V72) y v2 (V75, con semilla+estado) siguen vivas */
+    return s && (s.v === 1 || s.v === 2) && Number.isFinite(s.ronda)
+      ? s
+      : null;
   } catch {
     return null;
   }
@@ -171,7 +174,12 @@ export const trofeosGanados = (
 };
 
 /* ── el sello de la Volada del Día ── */
-export type SelloDiario = { puntos: number; ronda: number; fecha: string };
+export type SelloDiario = {
+  puntos: number;
+  ronda: number;
+  fecha: string;
+  modo: string; // V75: el modo con el que se selló (la diaria es feria)
+};
 
 export const leeSelloDiario = (): SelloDiario | null => {
   try {
@@ -181,15 +189,19 @@ export const leeSelloDiario = (): SelloDiario | null => {
     return null;
   }
 };
+/* V75: el PRIMER intento sella el día — la Volada del Día es una
+   visita al estilo Wordle; repetir por gusto no reescribe el sello */
 export const sellaDiario = (s: VolateriaStats) => {
   try {
+    if (leeSelloDiario()) return;
     const d = new Date();
     localStorage.setItem(
       dailyKey(d),
       JSON.stringify({
         puntos: s.puntos,
         ronda: s.ronda,
-        fecha: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+        fecha: `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
+        modo: s.modo,
       } satisfies SelloDiario),
     );
   } catch {}
@@ -199,7 +211,10 @@ export const sellaDiario = (s: VolateriaStats) => {
 export const textoDeRun = (s: VolateriaStats): string => {
   const acc = s.tiros > 0 ? Math.round((s.hits / s.tiros) * 100) : 0;
   const d = new Date();
-  const dia = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  /* la diaria comparte su fecha UTC — el mismo día para todo el planeta */
+  const dia = s.diaria
+    ? `${String(d.getUTCDate()).padStart(2, "0")}/${String(d.getUTCMonth() + 1).padStart(2, "0")}`
+    : `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
   const linea1 = s.diaria
     ? `VOLATERÍA · Volada del Día ${dia}`
     : `VOLATERÍA · modo ${s.modo.toUpperCase()}`;

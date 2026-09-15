@@ -85,7 +85,7 @@ export const LETRAS_PREMIO = "PREMIO";
 /* ── V72: LA RUN RECUPERABLE — la tarde no se pierde con un refresh ── */
 export const RUN_KEY = "vp-run";
 export type RunSnapshot = {
-  v: 1;
+  v: 1 | 2; // v2 (V75) lleva semilla+estado: continuar reproduce el MISMO cielo
   ronda: number; // la ronda QUE VIENE (ya superada la anterior)
   puntos: number;
   racha: number;
@@ -95,10 +95,12 @@ export type RunSnapshot = {
   letras: string; // "" · "PRE…" · "PREMIO"
   modo: ModoId;
   diaria: boolean;
+  semilla?: number; // V75: semilla de la run (diaria UTC o caos sembrado)
+  estado?: number; // V75: estado del rng al salvar — la tarde sigue exacta
 };
 
 /* llaves del localStorage de la meta (V72) */
 export const ARCHIVO_KEY = "vp-archivo";
 export const TROFEOS_KEY = "vp-trofeos";
 export const dailyKey = (d = new Date()) =>
-  `vp-daily-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  `vp-daily-${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;

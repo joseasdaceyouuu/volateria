@@ -92,6 +92,7 @@ const FASE_INICIAL: VolateriaStats = {
   viento: 0,
   letras: "",
   diaria: false,
+  semilla: 0,
   grazes: 0,
   jefes: 0,
   perfectas: 0,
@@ -231,6 +232,7 @@ export default function Volateria() {
       viento: stats.viento,
       letras: stats.letras,
       diaria: stats.diaria,
+      semilla: stats.semilla,
       grazes: stats.grazes,
       jefes: stats.jefes,
       perfectas: stats.perfectas,
@@ -567,7 +569,12 @@ export default function Volateria() {
                   <button
                     type="button"
                     onClick={() =>
-                      apiRef.current?.empezar(modoSel, { diaria: true })
+                      apiRef.current?.empezar("feria", { diaria: true })
+                    }
+                    title={
+                      sello
+                        ? "tu volada de hoy ya está sellada — repite por gusto, el sello no cambia"
+                        : undefined
                     }
                     className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-5 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
                   >
@@ -575,7 +582,7 @@ export default function Volateria() {
                     Volada del día
                     {sello && (
                       <span className="text-copper">
-                        · {sello.puntos} pts
+                        · sellada {sello.puntos} pts
                       </span>
                     )}
                   </button>
@@ -662,6 +669,15 @@ export default function Volateria() {
                     →
                   </span>
                 </button>
+                {/* V75: al cartel — ajustes y archivo sin soltar la tarde */}
+                <button
+                  type="button"
+                  onClick={() => apiRef.current?.alCartel()}
+                  className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-6 py-3 font-mono text-[10px] uppercase tracking-[0.25em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                >
+                  <span aria-hidden>⌂</span>
+                  Cartel
+                </button>
                 <SoundBtn
                   on={!stats.muted}
                   onToggle={() => apiRef.current?.snd()}
@@ -711,6 +727,15 @@ export default function Volateria() {
                   >
                     →
                   </span>
+                </button>
+                {/* V75: al cartel — la puerta de vuelta a la feria entera */}
+                <button
+                  type="button"
+                  onClick={() => apiRef.current?.alCartel()}
+                  className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-6 py-3 font-mono text-[10px] uppercase tracking-[0.25em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
+                >
+                  <span aria-hidden>⌂</span>
+                  Cartel
                 </button>
                 {/* V72: el texto de la tarde — spoiler-free, al hombro */}
                 <button

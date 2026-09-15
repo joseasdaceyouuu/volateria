@@ -145,7 +145,7 @@ import {
   type ModoId,
   type RunSnapshot,
 } from "./config";
-import { mulberry32, semillaDelDia, type Rng } from "./rng";
+import { mulberry32, semillaDelDia, type RngEstado } from "./rng";
 import {
   ESPECIES,
   PATRON_VEL,
@@ -209,6 +209,7 @@ export type VolateriaStats = {
   viento: number; // fuerza del vendaval (V71)
   letras: string; // letras del PREMIO recogidas (V71)
   diaria: boolean; // ¿volada del día? (V72)
+  semilla: number; // V75: semilla de la feria — la diaria es auditable
   grazes: number; // silbidos al pelo en la run (V72)
   jefes: number; // coronas abatidas en la run (V72)
   perfectas: number; // voladas perfectas en la run (V72)
@@ -229,6 +230,7 @@ export type VolateriaApi = {
   ) => void;
   snd: () => void;
   leave: () => void;
+  alCartel: () => void; // V75: volver al cartel desde la pausa o el fin
 };
 
 type Props = {
@@ -370,7 +372,8 @@ function VolateriaEngine({
     /* el azar del juego — Math.random en la partida libre; la
        Volada del Día planta la semilla (V72) y la feria repite
        el mismo vuelo para todo el planeta */
-    let rng: Rng = Math.random;
+    let semilla = 0; // V75: la semilla de la run (telemetría + continuar)
+    let rng: RngEstado = mulberry32(1); // empezar() planta la verdadera
 
     /* V73: los ajustes del cazador — el motor obedece a la sala */
     let aj: Ajustes = leeAjustes();
@@ -523,6 +526,7 @@ function VolateriaEngine({
         viento: Math.round(vientoF * 100) / 100,
         letras: letras.join(""),
         diaria,
+        semilla,
         grazes: grazesRun,
         jefes: jefesRun,
         perfectas: perfectasRun,
@@ -1081,7 +1085,7 @@ function VolateriaEngine({
 
     /* escolta del PATO REAL — zafiros que defienden la corona (idx −1) */
     const spawnEscolta = () => {
-      const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+      const dir: 1 | -1 = rng() < 0.5 ? 1 : -1;
       patos.push({
         tid: ++tid,
         tipo: "zafiro",
@@ -1421,6 +1425,7 @@ function VolateriaEngine({
           (q) => q.mini && q !== p && q.estado === "vuelo",
         );
         if (!quedan) {
+          jefesRun++; // V75: la última corona también cuenta
           volleyHits = cuotaModo(ronda, modo);
           banner = {
             txt: "¡LA BANDADA REAL CAE!",
@@ -1774,6 +1779,30 @@ function VolateriaEngine({
       emit();
     };
 
+    /* V75: volver al cartel LISTO desde la pausa o el fin — los ajustes
+       y el archivo vuelven a estar al alcance sin recargar la feria */
+    const irAlCartel = () => {
+      const enPausa = fase === "jugando" && pausado;
+      if (fase !== "fin" && !enPausa) return;
+      pausado = false;
+      audio.suspend();
+      patos.length = 0;
+      plumas.length = 0;
+      chispas.length = 0;
+      anillos.length = 0;
+      popups.length = 0;
+      globos.length = 0;
+      letras = [];
+      zorro.estado = "oculto";
+      zorro.t = 0;
+      banner = null;
+      freezeT = 0;
+      shakeA = 0;
+      flash = 0;
+      fase = "listo";
+      emit();
+    };
+
     /* el zorro: con la presa… o riéndose de ti */
     const convocaZorro = (x: number, hold: boolean, risa: boolean) => {
       zorro.estado = "sube";
@@ -1802,7 +1831,7 @@ function VolateriaEngine({
     const salvaRun = () => {
       try {
         const s: RunSnapshot = {
-          v: 1,
+          v: 2,
           ronda,
           puntos,
           racha,
@@ -1812,6 +1841,8 @@ function VolateriaEngine({
           letras: letras.join(""),
           modo: modo.id,
           diaria,
+          semilla, // V75: continuar reproduce el mismo cielo
+          estado: rng.estado(), // V75: el estado exacto del rng
         };
         localStorage.setItem(RUN_KEY, JSON.stringify(s));
       } catch {}
@@ -1837,8 +1868,12 @@ function VolateriaEngine({
       if (volleyHits >= cuotaModo(ronda, modo)) {
         /* VOLADA PERFECTA (V68) — ocho de ocho sin una fuga: la feria
            paga el respeto en puntos y en fanfarria */
+        /* V75: las rondas de jefe cobran su botín propio — no regalan
+           también la volada perfecta (era inflación de puntos) */
         const perfecta =
-          res.length === VOLADA && res.every((x) => x === "acierto");
+          !esJefe(ronda) &&
+          res.length === VOLADA &&
+          res.every((x) => x === "acierto");
         const premio = perfecta ? 200 * ronda : 0;
         if (premio > 0) {
           puntos += premio;
@@ -1922,11 +1957,30 @@ function VolateriaEngine({
       opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
     ) => {
       audio.gesto();
-      /* V72: la Volada del Día planta la semilla — misma feria para
-         todo el planeta; la partida libre vuelve al caos legítimo */
-      diaria = !!opts?.diaria;
-      rng = diaria ? mulberry32(semillaDelDia()) : Math.random;
-      if (m && MODOS[m]) modo = MODOS[m];
+      /* V72/V75: la Volada del Día planta la semilla — la MISMA feria
+         para todo el planeta (medianoche UTC) y SIEMPRE en modo FERIA;
+         la partida libre siembra su propio caos; CONTINUAR restaura la
+         semilla y el estado exactos — la tarde no cambia de cielo */
+      const c = opts?.continuar ?? null;
+      diaria = !!(c ? c.diaria : opts?.diaria);
+      if (
+        c &&
+        c.v === 2 &&
+        typeof c.semilla === "number" &&
+        typeof c.estado === "number"
+      ) {
+        semilla = c.semilla;
+        rng = mulberry32(semilla);
+        rng.restaura(c.estado);
+      } else if (diaria) {
+        semilla = semillaDelDia();
+        rng = mulberry32(semilla);
+      } else {
+        semilla = (Math.random() * 0x100000000) >>> 0;
+        rng = mulberry32(semilla);
+      }
+      if (diaria) modo = MODOS.feria;
+      else if (m && MODOS[m]) modo = MODOS[m];
       letras = [];
       cadena = 0;
       bandT = 900;
@@ -1940,10 +1994,8 @@ function VolateriaEngine({
       perfectasRun = 0;
       premiosRun = 0;
       for (const k of Object.keys(porEspecie)) delete porEspecie[k];
-      const c = opts?.continuar ?? null;
-      if (c && c.v === 1 && MODOS[c.modo]) {
-        modo = MODOS[c.modo];
-        diaria = !!c.diaria;
+      if (c && (c.v === 1 || c.v === 2) && MODOS[c.modo]) {
+        modo = diaria ? MODOS.feria : MODOS[c.modo];
         ronda = Math.max(1, Math.floor(c.ronda));
         puntos = Math.max(0, Math.floor(c.puntos));
         racha = Math.max(0, Math.floor(c.racha));
@@ -2047,7 +2099,7 @@ function VolateriaEngine({
             spawnSenuelo();
           /* V67: el señuelo sale MÁS SEGUIDO cada ronda */
           senT =
-            Math.max(340, 560 - 40 * (ronda - 1)) + Math.random() * 380;
+            Math.max(340, 560 - 40 * (ronda - 1)) + rng() * 380;
         }
       }
       if (ronda >= 2 && lanzados >= 1) {
@@ -2057,13 +2109,13 @@ function VolateriaEngine({
             spawnCuervo();
           /* V67: el cuervo también aprieta con las rondas */
           cuvT =
-            Math.max(300, 640 - 60 * (ronda - 2)) + Math.random() * 480;
+            Math.max(300, 640 - 60 * (ronda - 2)) + rng() * 480;
         }
       }
       globoT -= dt;
       if (globoT <= 0) {
         if (globos.length === 0 && lanzados >= 1) spawnGlobo();
-        globoT = 560 + Math.random() * 420;
+        globoT = 560 + rng() * 420;
       }
       /* V71: la banda silvestre — desde la ronda 4, sin límite de cuota */
       if (ronda >= 4 && lanzados >= 1 && !esJefe(ronda)) {
@@ -3345,6 +3397,7 @@ function VolateriaEngine({
           audio.snd();
           emit();
         },
+        alCartel: irAlCartel,
         leave: () => {
           puntero.inside = false;
         },

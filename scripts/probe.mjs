@@ -18,6 +18,8 @@
    8d. V71: modo/viento/letras en telemetría + selector VETERANO (2 balas).
    8e. V72: campos de meta (diaria/grazes/jefes/perfectas/premios/porEspecie).
    8c. GLOBO DE PODER: aparece, se le dispara → poder activo o PLOMO.
+   8f. V75: pausa→CARTEL→listo, diaria fija FERIA, semilla diaria firme
+      (misma semilla en dos arrancos) y partida libre con caos propio.
    9. MÓVIL 390: la feria vive (fps>=3) y el tap dispara (balas--).
   10. ESC sin salida (el juego ES la raíz). Cero errores de consola.
    Capturas en download/audit-volateria/. */
@@ -385,6 +387,73 @@ check(
   "v72 — telemetría de la meta (diaria, grazes, jefes, perfectas, premios, porEspecie)",
   Object.values(v72).every((t) => t === "boolean" || t === "number" || t === "object"),
   JSON.stringify(v72),
+);
+
+/* ── 8f · V75 — CALIBRADO: al cartel, diaria=feria, semilla firme ── */
+await page.keyboard.press("Escape"); /* pausa */
+await hasta(
+  page,
+  () => {
+    const d = window.__labD05Dbg ?? {};
+    return d.fase === "jugando" && d.pausa === true ? true : null;
+  },
+  10000,
+);
+await page.getByRole("button", { name: "Cartel" }).click();
+await sleep(700);
+const cartel75 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { fase: d.fase ?? "", pausa: d.pausa ?? null };
+});
+check(
+  "v75 — pausa → botón CARTEL → fase=listo",
+  cartel75.fase === "listo" && cartel75.pausa === false,
+  JSON.stringify(cartel75),
+);
+
+/* la Volada del Día es SIEMPRE feria y planta la MISMA semilla (UTC) */
+await page.getByRole("button", { name: /Volada del día/ }).click();
+await sleep(900);
+const d75a = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { diaria: d.diaria, modo: d.modo, semilla: d.semilla };
+});
+check(
+  "v75 — diaria fija modo feria + semilla plantada",
+  d75a.diaria === true &&
+    d75a.modo === "feria" &&
+    typeof d75a.semilla === "number" &&
+    d75a.semilla > 0,
+  JSON.stringify(d75a),
+);
+await page.keyboard.press("Escape");
+await sleep(500);
+await page.getByRole("button", { name: "Cartel" }).click();
+await sleep(500);
+await page.getByRole("button", { name: /Volada del día/ }).click();
+await sleep(900);
+const d75b = await page.evaluate(() => (window.__labD05Dbg ?? {}).semilla ?? 0);
+check(
+  "v75 — la diaria repite semilla (mismo cielo para el planeta)",
+  d75b === d75a.semilla,
+  `semilla1=${d75a.semilla} semilla2=${d75b}`,
+);
+
+/* la partida libre siembra su propio caos (semilla distinta) */
+await page.keyboard.press("Escape");
+await sleep(500);
+await page.getByRole("button", { name: "Cartel" }).click();
+await sleep(500);
+await page.getByRole("button", { name: "Comenzar" }).click();
+await sleep(900);
+const d75c = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { diaria: d.diaria, semilla: d.semilla };
+});
+check(
+  "v75 — la partida libre cambia de cielo (semilla nueva, no diaria)",
+  d75c.diaria === false && d75c.semilla !== d75a.semilla,
+  JSON.stringify(d75c),
 );
 
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
