@@ -11,8 +11,18 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.11.0)
+## La feria (v1.12.0)
 
+- **EL PLOMO ALCANZA LA FUGA (V84)** — la tercera corona de LA BANDADA REAL jamás
+  vuelve a burlarse a quemarropa: al expirar su reloj, el ave ESCALABA a la vista
+  y el plomo la atravesaba (el código traicionaba la promesa de V81 — "nada de
+  aves inmatables" — porque el disparo solo tocaba `estado === "vuelo"`). Ahora
+  mientras el ave siga en pantalla es COBRABLE: si le queda vida, el impacto la
+  devuelve a la feria ("¡el plomo la bajó!") con el reloj en la mano; si no, cae
+  desde el cielo. El "¡voló!" solo se canta al salir de pantalla, el botín final
+  no se canta con corona en el aire, el arnés forense gana el Test D "la fuga se
+  cobra" (con selector `SOLO`) y la sonda sube a **52/52** con tres checks nuevos
+  del caso exacto del reporte.
 - **EL NÚCLEO DESNUDO (V83)** — la casa se puede juzgar sin navegador: la
   geometría del plomo vive ahora en `nucleo.ts` (radios, orden de presa,
   graze — sin React, sin canvas, sin audio) y los números de la casa

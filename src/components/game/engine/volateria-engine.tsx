@@ -1359,6 +1359,22 @@ function VolateriaEngine({
         /* V81: el plomo SOSTIENE la corona — mientras la trabajes no
            se escapa; cada impacto le devuelve tiempo (260f ≈ 4 s) */
         p.escapeT = Math.max(p.escapeT, FUGA.sostener);
+        /* V84: si el impacto cae sobre la corona ESCALANDO, el plomo
+           la devuelve a la feria — reingresa con el reloj en la mano
+           y la caza sigue. La fuga nunca fue una salida. */
+        if (p.estado === "fuga") {
+          p.estado = "vuelo";
+          p.vy = 0;
+          popups.push({
+            x: Math.min(w - 110, Math.max(110, p.x)),
+            y: Math.max(120, p.y - 40 * p.scale * 0.5),
+            txt: "¡el plomo la bajó!",
+            t: 0,
+            vida: 70,
+            color: "#ffe9b0",
+            serif: true,
+          });
+        }
         freezeT = reduced ? 0 : 4;
         sacude(6);
         vibra(12);
@@ -1606,8 +1622,11 @@ function VolateriaEngine({
         });
         freezeT = reduced ? 0 : 5;
         sacude(9);
+        /* V84: la corona ESCALANDO (fuga) sigue viva a todos los
+           efectos — el botín final no se canta con una aún en el aire */
         const quedan = patos.some(
-          (q) => q.mini && q !== p && q.estado === "vuelo",
+          (q) =>
+            q.mini && q !== p && (q.estado === "vuelo" || q.estado === "fuga"),
         );
         if (!quedan) {
           jefesRun++; // V75: la última corona también cuenta
@@ -1881,7 +1900,10 @@ function VolateriaEngine({
         escopeta,
         aj.asistencia,
         (p) =>
-          p.estado === "vuelo" &&
+          /* V84: la fuga es cobrable — mientras el ave siga en pantalla
+             el plomo la alcanza (la promesa V81, ahora verdad). Jamás
+             más un ave burlándose a quemarropa. */
+          (p.estado === "vuelo" || p.estado === "fuga") &&
           !ESPECIES[p.tipo].cebo &&
           !(p.tipo === "humo" && alphaHumo(p) < 0.4),
       );
@@ -2780,22 +2802,9 @@ function VolateriaEngine({
               p.estado = "fuga";
               p.vy = -2.4;
               cadena = 0;
-              if (p.idx >= 0 && p.idx < VOLADA) {
-                res[p.idx] = "fuga";
-                escapes++;
-                racha = 0;
-                vibra(18);
-                popups.push({
-                  x: Math.min(w - 80, Math.max(80, p.x)),
-                  y: 96,
-                  txt: "¡voló!",
-                  t: 0,
-                  vida: 70,
-                  color: "rgba(250,246,236,0.85)",
-                  serif: true,
-                });
-                resueltoPato();
-              }
+              /* V84: el "voló" ya no se canta aquí — el ave SIGUE en
+                 pantalla y el plomo la alcanza. La cuenta del escape
+                 se hace cuando de verdad se va (y < -90). */
               emit();
             }
           }
@@ -2805,6 +2814,24 @@ function VolateriaEngine({
           p.y += p.vy * dtD;
           p.x += p.vx * 0.6 * dtD;
           if (p.y < -90) {
+            /* V84: la cuenta del escape al SALIR de pantalla — hasta
+               ese último frame el ave fue cobrable (nada de inmatables) */
+            if (p.idx >= 0 && p.idx < VOLADA) {
+              res[p.idx] = "fuga";
+              escapes++;
+              racha = 0;
+              vibra(18);
+              popups.push({
+                x: Math.min(w - 80, Math.max(80, p.x)),
+                y: 96,
+                txt: "¡voló!",
+                t: 0,
+                vida: 70,
+                color: "rgba(250,246,236,0.85)",
+                serif: true,
+              });
+              resueltoPato();
+            }
             patos.splice(i, 1);
             emit();
           }

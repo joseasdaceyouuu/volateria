@@ -913,6 +913,123 @@ check(
 );
 await page.screenshot({ path: `${OUT}10-cañon-seco.png` });
 
+/* ── 8m · V84 — LA FUGA SE COBRA ─────────────────────────────
+   El reporte persistente: "mato 2 de 3 y la tercera se burla
+   inmatable". Raíz final: al expirar el reloj la corona pasaba a
+   estado fuga y el plomo solo tocaba estado "vuelo" — el ave
+   ASCENDÍA a la vista y las balas la atravesaban. V84: mientras
+   el ave esté en pantalla es cobrable; si le queda vida, el
+   plomo la DEVUELVE a la feria. Repro exacto: matar 2, soltar
+   la 3ª, esperar su fuga (~23 s) y dispararle ESCALANDO → debe
+   reingresar en vuelo (o morir), y la bandada cerrar en ronda 9. */
+await page.evaluate(() => {
+  try {
+    localStorage.setItem(
+      "vp-run",
+      JSON.stringify({
+        v: 2, ronda: 8, puntos: 5000, racha: 0, hits: 0, escapes: 0,
+        tiros: 0, letras: "", modo: "feria", diaria: false,
+        semilla: 42, estado: 42,
+      }),
+    );
+  } catch {}
+});
+await page.reload({ waitUntil: "domcontentloaded" });
+await sleep(4200);
+await page.getByRole("button", { name: /Continuar/ }).click();
+await sleep(1500);
+/* fase A — dejar UNA corona viva (matar dos; vuelo o fuga: ambas cobrables) */
+const plazo84a = Date.now() + 90000;
+let vivas84 = 3;
+while (Date.now() < plazo84a) {
+  const st = await page.evaluate(() => {
+    const d = window.__labD05Dbg ?? {};
+    const vivas = (d.patos ?? []).filter(
+      (q) => q.tipo === "real" && (q.est === "vuelo" || q.est === "fuga"),
+    );
+    return {
+      vivas: vivas.map((q) => ({ id: q.id, x: q.x, y: q.y, est: q.est })),
+      ronda: d.ronda ?? 0, fase: d.fase ?? "", balas: d.balas ?? 0,
+    };
+  });
+  vivas84 = st.vivas.length;
+  if (st.fase !== "jugando" || vivas84 <= 1) break;
+  if (st.balas <= 0) { await page.keyboard.press("r"); await sleep(850); continue; }
+  await page.mouse.click(st.vivas[0].x * 1440, st.vivas[0].y * 900);
+  await sleep(300);
+}
+check(
+  "v84 — dos coronas cazadas, una en pie (la fuga acecha)",
+  vivas84 === 1,
+  `vivas=${vivas84}`,
+);
+/* fase B — esperar su fuga y DISPARARLE ESCALANDO */
+let cobrada84 = null;
+let vioFuga84 = false;
+const plazo84b = Date.now() + 45000;
+while (Date.now() < plazo84b && !cobrada84) {
+  const st = await page.evaluate(() => {
+    const d = window.__labD05Dbg ?? {};
+    const c = (d.patos ?? []).find(
+      (q) => q.tipo === "real" && (q.est === "vuelo" || q.est === "fuga"),
+    );
+    return { c: c ? { x: c.x, y: c.y, est: c.est } : null, balas: d.balas ?? 0, ronda: d.ronda ?? 0 };
+  });
+  if (!st.c) { cobrada84 = "muerta-en-fuga"; break; } // ya no está viva
+  if (st.c.est === "fuga") {
+    vioFuga84 = true;
+    if (st.balas <= 0) { await page.keyboard.press("r"); await sleep(850); continue; }
+    await page.mouse.click(st.c.x * 1440, st.c.y * 900);
+    await sleep(130);
+    const tras = await page.evaluate(() => {
+      const d = window.__labD05Dbg ?? {};
+      const reales = (d.patos ?? []).filter((q) => q.tipo === "real");
+      if (reales.some((q) => q.est === "vuelo")) return "vuelo";
+      if (reales.some((q) => q.est === "fuga")) return "fuga";
+      /* caida/suelto = cadáver: la fuga terminó en plomo */
+      return reales.length > 0 ? "cuerpo" : "muerta";
+    });
+    if (tras === "vuelo") cobrada84 = "bajo-el-plomo";
+    else if (tras === "cuerpo" || tras === "muerta") cobrada84 = "muerta-en-fuga";
+  } else if (vioFuga84 && st.c.est === "vuelo") {
+    /* el derribo registró entre dos lecturas */
+    cobrada84 = "bajo-el-plomo";
+  } else {
+    await sleep(200);
+  }
+}
+check(
+  "v84 — la corona ESCALANDO es COBRABLE (el plomo la baja o la mata)",
+  cobrada84 === "bajo-el-plomo" || cobrada84 === "muerta-en-fuga",
+  `veredicto=${cobrada84 ?? "se-escapo"}`,
+);
+await page.screenshot({ path: `${OUT}11-fuga-cobrada.png` });
+/* fase C — terminar el trabajo: la bandada cierra en ronda 9 */
+let ronda84 = 0;
+const plazo84c = Date.now() + 90000;
+while (Date.now() < plazo84c) {
+  const st = await page.evaluate(() => {
+    const d = window.__labD05Dbg ?? {};
+    const vivas = (d.patos ?? []).filter(
+      (q) => q.tipo === "real" && (q.est === "vuelo" || q.est === "fuga"),
+    );
+    return {
+      vivas: vivas.map((q) => ({ x: q.x, y: q.y })),
+      ronda: d.ronda ?? 0, fase: d.fase ?? "", balas: d.balas ?? 0,
+    };
+  });
+  ronda84 = st.ronda;
+  if (st.fase !== "jugando" || st.ronda >= 9) break;
+  if (st.balas <= 0) { await page.keyboard.press("r"); await sleep(850); continue; }
+  if (st.vivas.length > 0) await page.mouse.click(st.vivas[0].x * 1440, st.vivas[0].y * 900);
+  await sleep(300);
+}
+check(
+  "v84 — la bandada CIERRA tras el rescate (ronda 9)",
+  ronda84 >= 9,
+  `ronda=${ronda84}`,
+);
+
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });
 mob.on("pageerror", (e) => errors.push(`mob pageerror: ${e.message}`));

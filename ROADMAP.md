@@ -2,9 +2,11 @@
 
 > El tiro al pato de feria, reimaginado: atardecer de lona, zorro cómplice y un cargador que nunca sobra.
 
-## En escena (v1.11.0)
+## En escena (v1.12.0)
 
 Lo que ya luces bajo las bombillas de la feria:
+
+- **EL PLOMO ALCANZA LA FUGA (V84)** — adiós al último rincón inmatable: la corona de la Bandada Real que agotaba su reloj ASCENDÍA a la vista con el plomo atravesándola (el disparo solo tocaba `estado === "vuelo"` y la fuga era intocable — traición directa a la promesa V81 "nada de aves inmatables"). Ahora todo ave en pantalla es cobrable: el impacto sobre la fuga con vida la DEVUELVE a la feria ("¡el plomo la bajó!", reloj en mano), el golpe final la despeña desde el cielo, el "¡voló!" solo se canta al salir de pantalla y el botín de la bandada no se canta con corona en el aire. Arnés forense con Test D "la fuga se cobra" (selector `SOLO`) y sonda 52/52 con los tres checks del caso exacto del reporte.
 
 - **EL NÚCLEO DESNUDO (V83)** — el corazón puro del plomo extraído del monolito: `nucleo.ts` (geometría del disparo: radios, orden de presa, graze, cebo — sin React ni canvas ni audio), LA MIRA y LOS RELOJES DE FUGA y hpDeJefe en config como única fuente de verdad, **57 tests unitarios con `bun test`** (config/rng/nucleo/podio/fantasma/trofeos) con paso nuevo en CI, y `CACHE_NAME` sellado con la versión del paquete en el postbuild — el shell offline ya no queda viejo. Sonda e2e 49/49: el motor no cambió un frame.
 
