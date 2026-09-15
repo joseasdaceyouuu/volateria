@@ -214,6 +214,8 @@ export type VolateriaStats = {
   jefes: number; // coronas abatidas en la run (V72)
   perfectas: number; // voladas perfectas en la run (V72)
   premios: number; // PREMIOS completados en la run (V72)
+  rebotes: number; // V76: plomo rebotado por el espejo en la run
+  bandas: number; // V76: bandas silvestres completas en la run
   porEspecie: Record<string, number>; // cazados por especie (V72)
   patos: PatoTelemetria[];
 };
@@ -443,6 +445,8 @@ function VolateriaEngine({
     let jefesRun = 0;
     let perfectasRun = 0;
     let premiosRun = 0;
+    let rebotesRun = 0; // V76: plomo que el espejo devolvió
+    let bandasRun = 0; // V76: formaciones completas caídas por el guía
     const porEspecie: Record<string, number> = {};
 
     /* poder activo y sus trampas */
@@ -531,6 +535,8 @@ function VolateriaEngine({
         jefes: jefesRun,
         perfectas: perfectasRun,
         premios: premiosRun,
+        rebotes: rebotesRun,
+        bandas: bandasRun,
         porEspecie: { ...porEspecie },
         enCola: Math.max(0, VOLADA - lanzados),
         resultados: res.slice(),
@@ -1147,6 +1153,7 @@ function VolateriaEngine({
       /* el ESPEJO (V71) — a veces el plomo rebota y el vanidoso
          se teletransporta una banda más allá, sano y riéndose */
       if (p.tipo === "espejo" && p.estado === "vuelo" && rng() < 0.4) {
+        rebotesRun++; // V76: el plomo vuelve — el archivo lo cuenta
         p.flashT = 3;
         p.x = Math.max(
           w * 0.1,
@@ -1184,6 +1191,7 @@ function VolateriaEngine({
           serif: false,
         });
         if (p.guia) {
+          bandasRun++; // V76: la formación entera, por el suelo
           let extra = 0;
           for (const q of patos) {
             if (
@@ -1993,6 +2001,8 @@ function VolateriaEngine({
       jefesRun = 0;
       perfectasRun = 0;
       premiosRun = 0;
+      rebotesRun = 0;
+      bandasRun = 0;
       for (const k of Object.keys(porEspecie)) delete porEspecie[k];
       if (c && (c.v === 1 || c.v === 2) && MODOS[c.modo]) {
         modo = diaria ? MODOS.feria : MODOS[c.modo];

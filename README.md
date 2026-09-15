@@ -10,8 +10,12 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.3.0)
+## La feria (v1.4.0)
 
+- **La escalada (V76)** — rango de maestría por modo (APRENDIZ → LEYENDA) en
+  el archivo y en el fin; el podio local: las cinco mejores tardes de cada
+  modo (la diaria marca ☀); el bestiario cuenta rebotes del espejo y bandas
+  íntegras, y el grid del archivo llega a 12 estatuillas.
 - **La feria calibrada (V75)** — la Volada del Día ahora es de verdad
   planetaria: semilla por medianoche UTC, SIEMPRE en modo FERIA, un solo
   sello por día (el PRIMER intento manda, estilo Wordle) y la tarde

@@ -84,6 +84,10 @@ export type Archivo = {
   mejorRacha: number;
   maxPuntos: number;
   especie: Record<string, number>;
+  perfectas: number; // V76: voladas perfectas de toda la vida
+  premios: number; // V76: PREMIOS completados de toda la vida
+  rebotes: number; // V76: plomo que el espejo mandó de vuelta
+  bandas: number; // V76: formaciones completas caídas por el guía
 };
 
 export const ARCHIVO_VACIO: Archivo = {
@@ -96,6 +100,10 @@ export const ARCHIVO_VACIO: Archivo = {
   mejorRacha: 0,
   maxPuntos: 0,
   especie: {},
+  perfectas: 0,
+  premios: 0,
+  rebotes: 0,
+  bandas: 0,
 };
 
 export const leeArchivo = (): Archivo => {
@@ -135,7 +143,66 @@ export const fusionaArchivo = (a: Archivo, s: VolateriaStats): Archivo => ({
     }
     return e;
   })(),
+  perfectas: a.perfectas + s.perfectas,
+  premios: a.premios + s.premios,
+  rebotes: a.rebotes + s.rebotes,
+  bandas: a.bandas + s.bandas,
 });
+
+/* ── V76: LA ESCALADA — el rango de maestría que paga cada récord ── */
+export const ESCALERA_MAESTRIA = [
+  { min: 0, nombre: "APRENDIZ" },
+  { min: 2500, nombre: "CAZADOR" },
+  { min: 6000, nombre: "DIESTRO" },
+  { min: 12000, nombre: "MAESTRO" },
+  { min: 25000, nombre: "LEYENDA" },
+] as const;
+
+export const maestriaDe = (
+  record: number,
+): { nombre: string; min: number; proximo: number | null } => {
+  const r = Number.isFinite(record) ? Math.max(0, Math.floor(record)) : 0;
+  let i = 0;
+  for (let k = 0; k < ESCALERA_MAESTRIA.length; k++) {
+    if (r >= ESCALERA_MAESTRIA[k].min) i = k;
+  }
+  const actual = ESCALERA_MAESTRIA[i];
+  const proximo = ESCALERA_MAESTRIA[i + 1] ?? null;
+  return { nombre: actual.nombre, min: actual.min, proximo: proximo?.min ?? null };
+};
+
+/* ── V76: EL PODIO — las 5 mejores tardes de cada modo ── */
+export type PodioRun = {
+  puntos: number;
+  ronda: number;
+  fecha: string;
+  diaria: boolean;
+};
+export const PODIO_KEY = "vp-podio";
+
+export const leePodio = (): Record<string, PodioRun[]> => {
+  try {
+    const raw = localStorage.getItem(PODIO_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, PodioRun[]>) : {};
+  } catch {
+    return {};
+  }
+};
+
+export const meteEnPodio = (
+  modo: string,
+  run: PodioRun,
+): Record<string, PodioRun[]> => {
+  const p = leePodio();
+  const lista = [...(p[modo] ?? []), run]
+    .sort((x, y) => y.puntos - x.puntos)
+    .slice(0, 5);
+  const nuevo = { ...p, [modo]: lista };
+  try {
+    localStorage.setItem(PODIO_KEY, JSON.stringify(nuevo));
+  } catch {}
+  return nuevo;
+};
 
 /* ── los trofeos ganados — un objeto plano en el bolsillo ── */
 export const leeTrofeos = (): Record<string, boolean> => {

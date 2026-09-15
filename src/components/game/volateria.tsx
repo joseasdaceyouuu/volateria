@@ -48,12 +48,16 @@ import {
   guardaArchivo,
   guardaTrofeos,
   leeArchivo,
+  leePodio,
   leeRun,
   leeSelloDiario,
   leeTrofeos,
+  maestriaDe,
+  meteEnPodio,
   sellaDiario,
   trofeosGanados,
   type Archivo,
+  type PodioRun,
   type Trofeo,
 } from "./meta";
 
@@ -97,6 +101,8 @@ const FASE_INICIAL: VolateriaStats = {
   jefes: 0,
   perfectas: 0,
   premios: 0,
+  rebotes: 0,
+  bandas: 0,
   porEspecie: {},
   patos: [],
 };
@@ -139,6 +145,11 @@ export default function Volateria() {
   const [sello] = useState(() => leeSelloDiario());
   const [archivoAbierto, setArchivoAbierto] = useState(false);
   const [archivo, setArchivo] = useState<Archivo>(() => leeArchivo());
+  /* V76: el podio — se lee fresco del bolsillo al abrir el archivo */
+  const [podioVista, setPodioVista] = useState<Record<string, PodioRun[]>>(
+    () => leePodio(),
+  );
+  const [podioModo, setPodioModo] = useState<ModoId>("feria");
   const [trofeos, setTrofeos] = useState<Record<string, boolean>>(() =>
     leeTrofeos(),
   );
@@ -179,6 +190,16 @@ export default function Volateria() {
     const fus = fusionaArchivo(leeArchivo(), stats);
     guardaArchivo(fus);
     setArchivo(fus);
+    /* V76: el podio recoge la tarde si dejó puntos en el plato */
+    if (stats.puntos > 0) {
+      const d = new Date();
+      meteEnPodio(stats.modo, {
+        puntos: stats.puntos,
+        ronda: stats.ronda,
+        fecha: `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`,
+        diaria: stats.diaria,
+      });
+    }
     if (stats.diaria) sellaDiario(stats);
   }, [stats.fase, stats]);
 
@@ -237,6 +258,8 @@ export default function Volateria() {
       jefes: stats.jefes,
       perfectas: stats.perfectas,
       premios: stats.premios,
+      rebotes: stats.rebotes,
+      bandas: stats.bandas,
       porEspecie: stats.porEspecie,
       patos: stats.patos,
     };
@@ -257,6 +280,8 @@ export default function Volateria() {
 
   const jugando = stats.fase === "jugando";
   const enPausa = jugando && stats.pausa;
+  /* V76: el rango que consolida esta tarde (para el cartel del fin) */
+  const rangoFin = maestriaDe(stats.record);
   /* entrada escalonada de los carteles (una sola vez, tras el boot) */
   const entra = (delay: string) =>
     `transition-all duration-[900ms] ease-[cubic-bezier(0.22,1,0.36,1)] ${delay} ${
@@ -588,7 +613,10 @@ export default function Volateria() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setArchivoAbierto(true)}
+                    onClick={() => {
+                      setPodioVista(leePodio());
+                      setArchivoAbierto(true);
+                    }}
                     className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-5 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-copper/70 hover:text-copper"
                   >
                     <span aria-hidden>▦</span>
@@ -708,6 +736,13 @@ export default function Volateria() {
                 {stats.recordNuevo
                   ? "el zorro no va a olvidar esta tarde — nuevo récord"
                   : `ronda ${stats.ronda} · récord ${stats.record}`}
+              </p>
+              {/* V76: el rango que esta tarde consolida */}
+              <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-copper">
+                {rangoFin.nombre} en {stats.modo}
+                {rangoFin.proximo !== null
+                  ? ` · próximo peldaño: ${rangoFin.proximo} pts`
+                  : " · techo alcanzado"}
               </p>
               {stats.recordNuevo && (
                 <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-copper">
@@ -840,6 +875,10 @@ export default function Volateria() {
                     ["mejor racha", `×${1 + Math.min(3, Math.floor(archivo.mejorRacha / 3))}`],
                     ["máx puntos", String(archivo.maxPuntos)],
                     ["plomo gastado", String(archivo.tiros)],
+                    ["perfectas", String(archivo.perfectas)],
+                    ["premios", String(archivo.premios)],
+                    ["rebotes espejo", String(archivo.rebotes)],
+                    ["bandas íntegras", String(archivo.bandas)],
                   ].map(([k, v]) => (
                     <div key={k} className="border border-line/60 bg-[#0d0c0a] px-3 py-2.5">
                       <p className="font-mono text-[8px] uppercase tracking-[0.22em] text-faint">
@@ -850,6 +889,76 @@ export default function Volateria() {
                       </p>
                     </div>
                   ))}
+                </div>
+                {/* V76: LA ESCALADA — el rango que paga cada récord */}
+                <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
+                  La escalada — el rango que paga cada modo
+                </p>
+                <div className="mt-2 grid gap-1.5">
+                  {Object.values(MODOS).map((m) => {
+                    const rec = records[m.id] ?? 0;
+                    const ma = maestriaDe(rec);
+                    return (
+                      <div
+                        key={m.id}
+                        className="flex items-center justify-between gap-3 border border-line/60 bg-[#0d0c0a] px-3 py-2"
+                      >
+                        <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-cream/80">
+                          {m.nombre}
+                        </span>
+                        <span className="flex items-center gap-3 font-mono text-[9px] uppercase tracking-[0.18em]">
+                          <span className="text-faint tabular-nums">
+                            récord {rec}
+                          </span>
+                          <span className="text-copper">{ma.nombre}</span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* V76: EL PODIO — las 5 mejores tardes del modo */}
+                <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
+                  El podio — las cinco mejores tardes
+                </p>
+                <div className="mt-2 flex items-center gap-2">
+                  {Object.values(MODOS).map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setPodioModo(m.id)}
+                      aria-pressed={podioModo === m.id}
+                      className={`rounded-sm border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.16em] transition-colors duration-300 ${
+                        podioModo === m.id
+                          ? "border-copper/70 text-copper"
+                          : "border-line/60 text-faint/70 hover:border-copper/40"
+                      }`}
+                    >
+                      {m.nombre}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-1.5 max-h-32 overflow-y-auto pr-1">
+                  {(podioVista[podioModo] ?? []).length === 0 ? (
+                    <p className="border border-line/40 px-3 py-2 font-mono text-[9px] uppercase tracking-[0.18em] text-faint/60">
+                      aún no hay tardes — la feria espera
+                    </p>
+                  ) : (
+                    (podioVista[podioModo] ?? []).map((r, i) => (
+                      <div
+                        key={`${r.puntos}-${r.ronda}-${r.fecha}-${i}`}
+                        className="flex items-center justify-between gap-3 border-b border-line/30 px-3 py-1.5"
+                      >
+                        <span className="font-mono text-[10px] tabular-nums text-cream/85">
+                          <span className="text-faint">{i + 1}.</span>{" "}
+                          {r.puntos} pts
+                        </span>
+                        <span className="font-mono text-[9px] uppercase tracking-[0.16em] text-faint/75">
+                          ronda {r.ronda} · {r.fecha}
+                          {r.diaria ? " · ☀" : ""}
+                        </span>
+                      </div>
+                    ))
+                  )}
                 </div>
                 <p className="mt-6 font-mono text-[9px] uppercase tracking-[0.28em] text-faint">
                   El bestiario — lo cazado en toda la historia

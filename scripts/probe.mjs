@@ -381,10 +381,12 @@ const v72 = await page.evaluate(() => {
     perfectas: typeof d.perfectas,
     premios: typeof d.premios,
     porEspecie: typeof d.porEspecie,
+    rebotes: typeof d.rebotes,
+    bandas: typeof d.bandas,
   };
 });
 check(
-  "v72 — telemetría de la meta (diaria, grazes, jefes, perfectas, premios, porEspecie)",
+  "v72+v76 — telemetría de la meta (diaria, grazes, jefes, perfectas, premios, porEspecie, rebotes, bandas)",
   Object.values(v72).every((t) => t === "boolean" || t === "number" || t === "object"),
   JSON.stringify(v72),
 );
