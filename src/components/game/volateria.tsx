@@ -29,6 +29,7 @@ import {
   LETRAS_PREMIO,
   MODOS,
   PODER_DURACION,
+  fechaUtcDeHoy,
   type ModoId,
 } from "./engine/config";
 import {
@@ -36,6 +37,11 @@ import {
   leeAjustes,
   type Ajustes,
 } from "./ajustes";
+import {
+  guardaFantasma,
+  leeFantasma,
+  type Fantasma,
+} from "./fantasma";
 import PwaRegister from "./pwa-register";
 import VolateriaEngine, {
   type VolateriaApi,
@@ -103,6 +109,8 @@ const FASE_INICIAL: VolateriaStats = {
   premios: 0,
   rebotes: 0,
   bandas: 0,
+  replay: false,
+  grabando: false,
   porEspecie: {},
   patos: [],
 };
@@ -155,6 +163,10 @@ export default function Volateria() {
   );
   const [toast, setToast] = useState<{ txt: string; sub: string } | null>(null);
   const [shareTxt, setShareTxt] = useState("");
+  /* V78: el fantasma del día — la mejor diaria de hoy, revivible */
+  const [fantasmaHoy, setFantasmaHoy] = useState<Fantasma | null>(() =>
+    leeFantasma(),
+  );
   /* V77: la guía de la primera vez — solo visita quien nunca pasó de ronda 1 */
   const [guiaActiva] = useState(() => {
     try {
@@ -188,10 +200,14 @@ export default function Volateria() {
     setToast({ txt: `TROFEO — ${gana[0].nombre}`, sub: gana[0].desc });
   }, [stats]);
 
-  /* el archivo del cazador — se funde una vez por partida al caer */
+  /* el archivo del cazador — se funde una vez por partida al caer.
+     V78: REVIVIR no es cazar — el fantasma no toca archivo, ni
+     podio, ni sello, ni guía; y la diaria real deja fantasma nuevo
+     si su tarde fue la mejor del día */
   const mergeRef = useRef("");
   useEffect(() => {
     if (stats.fase !== "fin") return;
+    if (stats.replay) return;
     const sig = `${stats.puntos}-${stats.tiros}-${stats.ronda}-${stats.diaria}`;
     if (mergeRef.current === sig) return;
     mergeRef.current = sig;
@@ -208,7 +224,22 @@ export default function Volateria() {
         diaria: stats.diaria,
       });
     }
-    if (stats.diaria) sellaDiario(stats);
+    if (stats.diaria) {
+      sellaDiario(stats);
+      /* V78: el cuaderno de la tarde — si esta diaria supera al
+         fantasma vigente, lo releva (el cartel ofrecerá revivirla) */
+      const evs = apiRef.current?.eventos?.();
+      if (evs && evs.eventos.length > 0) {
+        const f: Fantasma = {
+          v: 1,
+          fecha: fechaUtcDeHoy(),
+          puntos: stats.puntos,
+          ronda: stats.ronda,
+          eventos: evs.eventos,
+        };
+        if (guardaFantasma(f)) setFantasmaHoy(f);
+      }
+    }
     /* V77: la guía se despide para siempre en la primera tarde cerrada */
     try {
       localStorage.setItem("vp-guia", "1");
@@ -272,6 +303,8 @@ export default function Volateria() {
       premios: stats.premios,
       rebotes: stats.rebotes,
       bandas: stats.bandas,
+      replay: stats.replay,
+      grabando: stats.grabando,
       porEspecie: stats.porEspecie,
       patos: stats.patos,
     };
@@ -623,6 +656,27 @@ export default function Volateria() {
                       </span>
                     )}
                   </button>
+                  {/* V78: EL FANTASMA — revivir la mejor diaria de hoy.
+                     Solo si es de HOY: la feria se siembra al alba */}
+                  {fantasmaHoy && fantasmaHoy.fecha === fechaUtcDeHoy() && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        apiRef.current?.empezar("feria", {
+                          diaria: true,
+                          replay: fantasmaHoy.eventos,
+                        })
+                      }
+                      title="revive tu mejor volada de hoy, tiro a tiro — sin honores en juego"
+                      className="inline-flex items-center gap-2 rounded-full border border-line bg-ink/60 px-5 py-2 font-mono text-[10px] uppercase tracking-[0.2em] text-smoke transition-colors duration-300 hover:border-[#7fd4c2]/70 hover:text-[#7fd4c2]"
+                    >
+                      <span aria-hidden>☾</span>
+                      El fantasma
+                      <span className="text-[#7fd4c2]">
+                        · {fantasmaHoy.puntos} pts
+                      </span>
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -676,18 +730,46 @@ export default function Volateria() {
           </div>
         )}
 
-        {/* V77: la guía de la primera vez — susurros de la ronda 1 */}
-        {guiaActiva && jugando && !enPausa && stats.ronda === 1 && (
+        {/* V77: la guía de la primera vez — susurros de la ronda 1.
+           V78: al fantasma nadie le da lecciones */}
+        {guiaActiva &&
+          jugando &&
+          !enPausa &&
+          !stats.replay &&
+          stats.ronda === 1 && (
+            <div
+              data-volateria-ui
+              aria-live="polite"
+              className="pointer-events-none absolute bottom-28 left-1/2 z-[93] max-w-[86vw] -translate-x-1/2 rounded-full border border-line/70 bg-ink/70 px-5 py-2 text-center font-mono text-[9px] uppercase tracking-[0.22em] text-smoke backdrop-blur-sm md:bottom-24"
+            >
+              {stats.hits >= 1
+                ? "R recarga · llena la cuota y la ronda crece"
+                : stats.tiros >= 1
+                  ? "cuidado: hay señuelos y cuervos que cobran plomo"
+                  : "la mira vive en tu cursor — apunta y dispara"}
+            </div>
+          )}
+
+        {/* V78: EL FANTASMA EN ESCENA — la tarde se cuenta sola.
+           Sin input (el motor lo bloquea) y sin honores: solo show */}
+        {jugando && !enPausa && stats.replay && (
           <div
             data-volateria-ui
             aria-live="polite"
-            className="pointer-events-none absolute bottom-28 left-1/2 z-[93] max-w-[86vw] -translate-x-1/2 rounded-full border border-line/70 bg-ink/70 px-5 py-2 text-center font-mono text-[9px] uppercase tracking-[0.22em] text-smoke backdrop-blur-sm md:bottom-24"
+            className="absolute bottom-28 left-1/2 z-[93] flex max-w-[92vw] -translate-x-1/2 items-center gap-3 rounded-full border border-[#7fd4c2]/40 bg-ink/70 py-2 pl-5 pr-2 font-mono text-[9px] uppercase tracking-[0.22em] text-[#7fd4c2] backdrop-blur-sm md:bottom-24"
           >
-            {stats.hits >= 1
-              ? "R recarga · llena la cuota y la ronda crece"
-              : stats.tiros >= 1
-                ? "cuidado: hay señuelos y cuervos que cobran plomo"
-                : "la mira vive en tu cursor — apunta y dispara"}
+            <span aria-hidden>☾</span>
+            <span className="whitespace-nowrap">
+              reviviendo el fantasma
+              {fantasmaHoy ? ` · ${fantasmaHoy.puntos} pts` : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => apiRef.current?.alCartel()}
+              className="pointer-events-auto whitespace-nowrap rounded-full border border-[#7fd4c2]/50 px-3 py-1 text-[9px] uppercase tracking-[0.2em] text-[#7fd4c2] transition-colors duration-300 hover:bg-[#7fd4c2]/15"
+            >
+              salir
+            </button>
           </div>
         )}
 
@@ -745,8 +827,8 @@ export default function Volateria() {
           </div>
         )}
 
-        {/* ── cartel FIN — la feria cierra ── */}
-        {stats.fase === "fin" && (
+        {/* ── cartel FIN — la feria cierra (V78: solo tardes reales) ── */}
+        {stats.fase === "fin" && !stats.replay && (
           <div
             data-volateria-ui
             className="absolute inset-0 z-[94] grid place-items-center bg-[#0a0908]/50 backdrop-blur-[3px]"
@@ -807,6 +889,50 @@ export default function Volateria() {
                 >
                   <span aria-hidden>✉</span>
                   {shareTxt === "" ? "Compartir" : shareTxt}
+                </button>
+                <SoundBtn
+                  on={!stats.muted}
+                  onToggle={() => apiRef.current?.snd()}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── V78: el fantasma acabó de revivir la tarde — cortina del
+           espectáculo: sin honores, sin reintentar, solo el aplauso ── */}
+        {stats.fase === "fin" && stats.replay && (
+          <div
+            data-volateria-ui
+            className="absolute inset-0 z-[94] grid place-items-center bg-[#0a0908]/50 backdrop-blur-[3px]"
+          >
+            <div className="mx-6 max-w-xl text-center">
+              <h2 className="font-mono text-[10px] uppercase tracking-[0.34em] text-[#7fd4c2]">
+                El fantasma descansa
+              </h2>
+              <p className="mt-6 font-mono text-6xl font-semibold tabular-nums text-cream/90 md:text-7xl">
+                {stats.puntos}
+              </p>
+              <p className="mt-3 font-serif text-lg italic text-cream/75">
+                así voló tu fantasma hoy: ronda {stats.ronda} ·{" "}
+                {stats.tiros} disparos
+              </p>
+              <p className="mt-2 font-mono text-[10px] uppercase tracking-[0.28em] text-faint">
+                la tarde real no cambia — honores intactos
+              </p>
+              <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => apiRef.current?.alCartel()}
+                  className="group inline-flex items-center gap-3 rounded-full border border-copper/70 bg-copper/10 px-8 py-3.5 font-mono text-[11px] uppercase tracking-[0.3em] text-copper transition-colors duration-300 hover:bg-copper/20"
+                >
+                  Cartel
+                  <span
+                    aria-hidden
+                    className="transition-transform duration-300 group-hover:translate-x-1"
+                  >
+                    →
+                  </span>
                 </button>
                 <SoundBtn
                   on={!stats.muted}

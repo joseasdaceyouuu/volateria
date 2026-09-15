@@ -2,10 +2,11 @@
 
 > El tiro al pato de feria, reimaginado: atardecer de lona, zorro cómplice y un cargador que nunca sobra.
 
-## En escena (v1.5.0)
+## En escena (v1.6.0)
 
 Lo que ya luces bajo las bombillas de la feria:
 
+- **El fantasma de la feria (V78)** — la Volada del Día graba cada disparo con el reloj de la tarde y al caer deja un fantasma: tu mejor diaria del día, revivible tiro a tiro desde el cartel (☾). El replay dispara solo (input bloqueado) y sin tocar honores: ni récord, ni sello, ni podio, ni archivo.
 - **La primera vez (V77)** — la guía susurra tres consejos en la ronda 1 de la primera visita (mira, engaños, recarga) y se despide para siempre al cerrar la tarde; la CADENA DE PERFECTAS multiplica la hazaña seguida (×2 y ×3).
 - **La escalada (V76)** — rango de maestría por modo (APRENDIZ→LEYENDA) en el archivo y en el fin, el podio local con las cinco mejores tardes de cada modo (la diaria marca ☀), y el bestiario cuenta rebotes del espejo y bandas íntegras.
 - **La feria calibrada (V75)** — Volada del Día planetaria de verdad: semilla UTC, modo FERIA fijo, un solo sello por día (el primero manda) y CONTINUAR restaura la semilla exacta de la tarde.
@@ -50,7 +51,7 @@ Apuntadas con tiza en la pared del taller; requieren capataz y calma:
 - **Ports a portales de web games** — llevar la caseta a itch.io, Poki y CrazyGames: más feria, más público.
 - **Analytics privacy-first** — telemetría propia sin cookies ni rastreadores: saber cuánta gente juega sin espiarla.
 - **Reporte de errores** — captura de fallos del cliente con contexto mínimo (seed, fase, fps) para depurar de noche.
-- **Replays deterministas visualizables** — con el RNG seedeado, grabar y reproducir la caza como un diálogo del zorro.
+- **Fantasma-rival de la casa** — compartir el cuaderno de la tarde (JSON del fantasma) para revivir las tardes de otros cazadores.
 - **Modo duelo pase-el-teléfono** — dos tiradores, un cargador: turnos alternos en el mismo fusil para dirimir rivalidades.
 
 ---

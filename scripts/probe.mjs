@@ -20,6 +20,9 @@
    8c. GLOBO DE PODER: aparece, se le dispara → poder activo o PLOMO.
    8f. V75: pausa→CARTEL→listo, diaria fija FERIA, semilla diaria firme
       (misma semilla en dos arrancos) y partida libre con caos propio.
+   8g. V78 EL FANTASMA: fantasma sembrado → botón en el cartel →
+      replay dispara SOLO (sin input), input vivo bloqueado, SALIR
+      vuelve al cartel, y la diaria real graba (grabando=true).
    9. MÓVIL 390: la feria vive (fps>=3) y el tap dispara (balas--).
   10. ESC sin salida (el juego ES la raíz). Cero errores de consola.
    Capturas en download/audit-volateria/. */
@@ -457,6 +460,110 @@ check(
   d75c.diaria === false && d75c.semilla !== d75a.semilla,
   JSON.stringify(d75c),
 );
+
+/* ── 8g · V78 — EL FANTASMA: replay determinista sin input ── */
+await page.keyboard.press("Escape");
+await sleep(500);
+await page.getByRole("button", { name: "Cartel" }).click();
+await sleep(700);
+/* siembro el fantasma de hoy (dos disparos y una recarga anotados)
+   y recargo la sala para que el cartel lo lea del bolsillo */
+await page.evaluate(() => {
+  const d = new Date();
+  const fecha = `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+  localStorage.setItem(
+    `vp-fantasma-${fecha}`,
+    JSON.stringify({
+      v: 1,
+      fecha,
+      puntos: 333,
+      ronda: 1,
+      eventos: [
+        { t: 1.2, x: 620, y: 260, tipo: "d" },
+        { t: 2.4, x: 760, y: 300, tipo: "d" },
+        { t: 3.0, tipo: "r" },
+      ],
+    }),
+  );
+});
+await page.reload({ waitUntil: "domcontentloaded" });
+await hasta(
+  page,
+  () => ((window.__labD05Dbg ?? {}).fase === "listo" ? true : null),
+  20000,
+);
+const fantasmaBtn = page.getByRole("button", { name: /El fantasma/ });
+check(
+  "v78 — el cartel ofrece EL FANTASMA (333 pts de hoy)",
+  await fantasmaBtn.isVisible(),
+);
+await fantasmaBtn.click();
+await hasta(
+  page,
+  () => {
+    const d = window.__labD05Dbg ?? {};
+    return d.fase === "jugando" && d.replay === true ? true : null;
+  },
+  10000,
+);
+const g1 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { replay: d.replay, grabando: d.grabando, tiros: d.tiros, diaria: d.diaria };
+});
+check(
+  "v78 — replay en marcha: replay=true, grabando=false, diaria=true",
+  g1.replay === true && g1.grabando === false && g1.diaria === true,
+  JSON.stringify(g1),
+);
+/* el fantasma cobra sus disparos SOLO — nadie toca el ratón */
+const tirosAuto =
+  (await hasta(
+    page,
+    () => {
+      const t = (window.__labD05Dbg ?? {}).tiros ?? 0;
+      return t >= 2 ? t : null;
+    },
+    15000,
+    200,
+  )) ?? 0;
+check("v78 — el fantasma disparó solo (tiros>=2 sin input)", tirosAuto >= 2, `tiros=${tirosAuto}`);
+/* el input vivo no cuela: clic y R no añaden plomo */
+await page.mouse.click(500, 400);
+await page.keyboard.press("r");
+await sleep(600);
+const g2 = await page.evaluate(() => (window.__labD05Dbg ?? {}).tiros ?? 0);
+check("v78 — input vivo bloqueado durante el replay", g2 === tirosAuto, `tiros=${g2} (antes ${tirosAuto})`);
+await page.screenshot({ path: `${OUT}06-fantasma.png` });
+/* SALIR → cartel limpio sin fantasma en escena */
+await page.getByRole("button", { name: "salir" }).click();
+await sleep(700);
+const g3 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { fase: d.fase, replay: d.replay };
+});
+check(
+  "v78 — salir del fantasma → cartel listo, replay=false",
+  g3.fase === "listo" && g3.replay === false,
+  JSON.stringify(g3),
+);
+/* la diaria REAL graba su cuaderno */
+await page.getByRole("button", { name: /Volada del día/ }).click();
+await sleep(900);
+await page.mouse.click(620, 320);
+await sleep(500);
+const g4 = await page.evaluate(() => {
+  const d = window.__labD05Dbg ?? {};
+  return { grabando: d.grabando, replay: d.replay, tiros: d.tiros };
+});
+check(
+  "v78 — diaria real graba (grabando=true, sin replay)",
+  g4.grabando === true && g4.replay === false && g4.tiros >= 1,
+  JSON.stringify(g4),
+);
+await page.keyboard.press("Escape");
+await sleep(500);
+await page.getByRole("button", { name: "Cartel" }).click();
+await sleep(600);
 
 /* ── 9 · MÓVIL 390 — la feria cabe en el bolsillo ────────────── */
 const mob = await browser.newPage({ viewport: { width: 390, height: 844 }, hasTouch: true });

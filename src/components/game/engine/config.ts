@@ -102,5 +102,8 @@ export type RunSnapshot = {
 /* llaves del localStorage de la meta (V72) */
 export const ARCHIVO_KEY = "vp-archivo";
 export const TROFEOS_KEY = "vp-trofeos";
-export const dailyKey = (d = new Date()) =>
-  `vp-daily-${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+/* V78: la fecha UTC de hoy en texto — la misma para todo el planeta;
+   el sello diario y el fantasma comparten este reloj */
+export const fechaUtcDeHoy = (d = new Date()) =>
+  `${d.getUTCFullYear()}-${d.getUTCMonth() + 1}-${d.getUTCDate()}`;
+export const dailyKey = (d = new Date()) => `vp-daily-${fechaUtcDeHoy(d)}`;

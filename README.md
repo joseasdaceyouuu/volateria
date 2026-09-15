@@ -3,15 +3,20 @@
 **El tiro al pato de feria, reimaginado.** Un arcade de caza completo en el
 navegador: oleadas veloces con vuelo evasivo, señuelos traidores, globos de
 poder, jefes rotativos (EL PATO REAL y LA BANDADA REAL), viento de feria,
-tres modos de juego, Volada del Día y una feria con memoria. Instalable
-como app (PWA) y jugable offline.
+tres modos de juego, Volada del Día con FANTASMA revivible y una feria con
+memoria. Instalable como app (PWA) y jugable offline.
 
 Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.5.0)
+## La feria (v1.6.0)
 
+- **El fantasma de la feria (V78)** — tu mejor Volada del Día del día queda
+  grabada tiro a tiro: el cartel ofrece **☾ EL FANTASMA** y la tarde se
+  revive sola (mismo cielo sembrado, mismos disparos en el mismo instante).
+  El replay bloquea el input y no toca honores: ni récord, ni sello, ni
+  podio, ni archivo — solo espectáculo y una cortina propia al terminar.
 - **La escalada (V76)** — rango de maestría por modo (APRENDIZ → LEYENDA) en
   el archivo y en el fin; el podio local: las cinco mejores tardes de cada
   modo (la diaria marca ☀); el bestiario cuenta rebotes del espejo y bandas

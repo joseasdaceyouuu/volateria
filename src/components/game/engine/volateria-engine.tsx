@@ -216,8 +216,20 @@ export type VolateriaStats = {
   premios: number; // PREMIOS completados en la run (V72)
   rebotes: number; // V76: plomo rebotado por el espejo en la run
   bandas: number; // V76: bandas silvestres completas en la run
+  replay: boolean; // V78: la feria se está reviviendo (sin input, sin honores)
+  grabando: boolean; // V78: esta tarde deja fantasma (diaria fresca)
   porEspecie: Record<string, number>; // cazados por especie (V72)
   patos: PatoTelemetria[];
+};
+
+/* V78: EL FANTASMA — un disparo/recarga anotado con el reloj de la
+   tarde (segundos de mundo vivos, sin pausas). Con la semilla de la
+   diaria basta para revivir la MISMA feria tiro a tiro. */
+export type EventoFantasma = {
+  t: number; // reloj de la tarde (tRun) en el que ocurrió
+  x?: number; // pantalla CSS px — solo en disparos
+  y?: number;
+  tipo: "d" | "r"; // d disparo · r recarga (R)
 };
 
 export type VolateriaApi = {
@@ -228,11 +240,17 @@ export type VolateriaApi = {
   ajustes: (a: Partial<Ajustes>) => void;
   empezar: (
     m?: ModoId,
-    opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
+    opts?: {
+      continuar?: RunSnapshot | null;
+      diaria?: boolean;
+      replay?: EventoFantasma[]; // V78: revivir la tarde grabada
+    },
   ) => void;
   snd: () => void;
   leave: () => void;
   alCartel: () => void; // V75: volver al cartel desde la pausa o el fin
+  /* V78: los eventos grabados de la tarde — null si no se grabó nada */
+  eventos: () => { semilla: number; eventos: EventoFantasma[] } | null;
 };
 
 type Props = {
@@ -448,6 +466,13 @@ function VolateriaEngine({
     let rebotesRun = 0; // V76: plomo que el espejo devolvió
     let bandasRun = 0; // V76: formaciones completas caídas por el guía
     let perfectasSeguidas = 0; // V77: la cadena de perfectas
+    /* V78: EL FANTASMA — reloj de la tarde, grabación y replay */
+    let tRun = 0; // segundos de mundo vivos (sin pausas ni carteles)
+    let grabando = false; // esta diaria deja fantasma
+    let eventosGrabados: EventoFantasma[] | null = null;
+    let replayActivo = false; // reviviendo: sin input y sin honores
+    let eventosReplay: EventoFantasma[] = [];
+    let idxReplay = 0;
     const porEspecie: Record<string, number> = {};
 
     /* poder activo y sus trampas */
@@ -538,6 +563,8 @@ function VolateriaEngine({
         premios: premiosRun,
         rebotes: rebotesRun,
         bandas: bandasRun,
+        replay: replayActivo,
+        grabando,
         porEspecie: { ...porEspecie },
         enCola: Math.max(0, VOLADA - lanzados),
         resultados: res.slice(),
@@ -1621,8 +1648,9 @@ function VolateriaEngine({
       audio.poder();
     };
 
-    const disparo = (cx: number, cy: number) => {
-      if (fase !== "jugando" || pausado) return;
+    /* V78: el plomo real — disparo sin cortafuegos del replay; el
+       consumidor del fantasma y la Sala (vía disparo) llegan aquí */
+    const disparaInterno = (cx: number, cy: number) => {
       puntero.x = cx;
       puntero.y = cy;
       puntero.inside = true;
@@ -1742,12 +1770,28 @@ function VolateriaEngine({
       emit();
     };
 
-    const recargar = () => {
-      if (fase !== "jugando" || pausado || balas >= cargador || recT > 0)
-        return;
+    const recargarInterno = () => {
+      if (balas >= cargador || recT > 0) return;
       recT = 27;
       audio.recarga();
       emit();
+    };
+
+    /* V78: las puertas de la Sala — cortan el paso al fantasma y
+       anotan el evento en el cuaderno cuando la tarde se graba */
+    const disparo = (cx: number, cy: number) => {
+      if (replayActivo) return; // el fantasma manda en el plomo
+      if (fase !== "jugando" || pausado) return;
+      if (grabando && eventosGrabados)
+        eventosGrabados.push({ t: tRun, x: cx, y: cy, tipo: "d" });
+      disparaInterno(cx, cy);
+    };
+    const recargar = () => {
+      if (replayActivo) return;
+      if (fase !== "jugando" || pausado) return;
+      if (grabando && eventosGrabados)
+        eventosGrabados.push({ t: tRun, tipo: "r" });
+      recargarInterno();
     };
 
     /* V69: la PAUSA de la sala — el mundo contiene el aliento, el
@@ -1791,8 +1835,9 @@ function VolateriaEngine({
     /* V75: volver al cartel LISTO desde la pausa o el fin — los ajustes
        y el archivo vuelven a estar al alcance sin recargar la feria */
     const irAlCartel = () => {
+      /* V78: el replay también tiene puerta — salir del fantasma */
       const enPausa = fase === "jugando" && pausado;
-      if (fase !== "fin" && !enPausa) return;
+      if (fase !== "fin" && !enPausa && !replayActivo) return;
       pausado = false;
       audio.suspend();
       patos.length = 0;
@@ -1808,6 +1853,13 @@ function VolateriaEngine({
       freezeT = 0;
       shakeA = 0;
       flash = 0;
+      /* V78: cualquier fantasma en escena se disuelve al volver */
+      grabando = false;
+      eventosGrabados = null;
+      replayActivo = false;
+      eventosReplay = [];
+      idxReplay = 0;
+      tRun = 0;
       fase = "listo";
       emit();
     };
@@ -1836,8 +1888,10 @@ function VolateriaEngine({
       }
     };
 
-    /* V72: el autoguardado de la feria — snapshot al pasar ronda */
+    /* V72: el autoguardado de la feria — snapshot al pasar ronda.
+       V78: el fantasma espectáculo, no tarde — no escribe nada */
     const salvaRun = () => {
+      if (replayActivo) return;
       try {
         const s: RunSnapshot = {
           v: 2,
@@ -1859,14 +1913,18 @@ function VolateriaEngine({
 
     const finDelJuego = () => {
       fase = "fin";
-      recordNuevo = puntos > record;
+      /* V78: revivir la tarde no concede honores ni borra la run real
+         que el cazador tenga guardada — el fantasma solo mira */
+      recordNuevo = !replayActivo && puntos > record;
       if (recordNuevo) {
         record = puntos;
         guardarRecord(modo.recordKey, puntos);
       }
-      try {
-        localStorage.removeItem(RUN_KEY);
-      } catch {}
+      if (!replayActivo) {
+        try {
+          localStorage.removeItem(RUN_KEY);
+        } catch {}
+      }
       audio.fin();
       emit();
     };
@@ -1970,7 +2028,11 @@ function VolateriaEngine({
 
     const empezar = (
       m?: ModoId,
-      opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
+      opts?: {
+        continuar?: RunSnapshot | null;
+        diaria?: boolean;
+        replay?: EventoFantasma[];
+      },
     ) => {
       audio.gesto();
       /* V72/V75: la Volada del Día planta la semilla — la MISMA feria
@@ -1979,6 +2041,17 @@ function VolateriaEngine({
          semilla y el estado exactos — la tarde no cambia de cielo */
       const c = opts?.continuar ?? null;
       diaria = !!(c ? c.diaria : opts?.diaria);
+      /* V78: relojes y cuadernos a cero en cada arranque. Graban las
+         diarias FRESCAS (una tarde continua, sin CONTINUAR); revivir
+         reproduce el cuaderno y come el input; lo demás no deja rastro */
+      tRun = 0;
+      idxReplay = 0;
+      replayActivo = !!opts?.replay;
+      eventosReplay = replayActivo
+        ? [...(opts?.replay ?? [])].sort((a, b) => a.t - b.t)
+        : [];
+      grabando = diaria && !c && !replayActivo;
+      eventosGrabados = grabando ? [] : null;
       if (
         c &&
         c.v === 2 &&
@@ -3363,6 +3436,14 @@ function VolateriaEngine({
       tGlobal += dt / 60;
 
       if (fase === "jugando" && !pausado) {
+        /* V78: el reloj de la tarde corre — y el fantasma cobra sus
+           disparos justo cuando los hubo (antes de mover el mundo) */
+        tRun += dt / 60;
+        while (idxReplay < eventosReplay.length && eventosReplay[idxReplay].t <= tRun) {
+          const ev = eventosReplay[idxReplay++];
+          if (ev.tipo === "d") disparaInterno(ev.x ?? w / 2, ev.y ?? h * 0.4);
+          else recargarInterno();
+        }
         pollPad();
         if (freezeT > 0) {
           freezeT -= dt; /* hitstop — el mundo contiene el aliento */
@@ -3408,15 +3489,18 @@ function VolateriaEngine({
           audio.setVolumen(aj.volumen);
           emit();
         },
-        empezar: (
-          m?: ModoId,
-          opts?: { continuar?: RunSnapshot | null; diaria?: boolean },
-        ) => empezar(m, opts),
+        empezar, /* V78: firma con replay — la propia función local */
         snd: () => {
           audio.snd();
           emit();
         },
         alCartel: irAlCartel,
+        /* V78: el cuaderno de la tarde — la Sala lo guarda al fin si
+           la diaria dejó fantasma (y solo si fue su mejor tarde) */
+        eventos: () =>
+          eventosGrabados && eventosGrabados.length > 0
+            ? { semilla, eventos: eventosGrabados }
+            : null,
         leave: () => {
           puntero.inside = false;
         },
