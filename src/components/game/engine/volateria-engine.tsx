@@ -139,6 +139,8 @@ import {
   cuotaModo,
   tipoDeJefe,
   TRAMPA,
+  hpDeJefe,
+  FUGA,
 } from "./config";
 import {
   RUN_KEY,
@@ -147,6 +149,7 @@ import {
   type RunSnapshot,
 } from "./config";
 import { mulberry32, semillaDelDia, type RngEstado } from "./rng";
+import * as nucleo from "./nucleo";
 import {
   ESPECIES,
   PATRON_VEL,
@@ -946,7 +949,7 @@ function VolateriaEngine({
         fadeT: 0,
         targetY: bandaTop + 30 + rng() * Math.max(30, bandaBot - bandaTop - 60),
         retargetT: 1e9,
-        escapeT: 1e9,
+        escapeT: FUGA.eterno,
         evadeCd: 1e9,
         fintaT: 0,
         fintaCd: 1e9,
@@ -986,7 +989,7 @@ function VolateriaEngine({
         fadeT: 0,
         targetY: 0,
         retargetT: 1e9,
-        escapeT: 1e9,
+        escapeT: FUGA.eterno,
         evadeCd: 1e9,
         fintaT: 0,
         fintaCd: 1e9,
@@ -1042,7 +1045,7 @@ function VolateriaEngine({
           /* V81: la banda silvestre respeta el reloj de la feria — si
              nadie la caza, se va al cielo (~16 s) en vez de dar vueltas
              eternas rebotando de borde en borde */
-          escapeT: 900 + rng() * 240,
+          escapeT: FUGA.banda + rng() * FUGA.bandaAzar,
           evadeCd: 1e9,
           fintaT: 0,
           fintaCd: 1e9,
@@ -1091,7 +1094,7 @@ function VolateriaEngine({
         fadeT: 0,
         targetY: bandaTop + 60 + rng() * Math.max(50, bandaBot - bandaTop - 90),
         retargetT: 80 + rng() * 70,
-        escapeT: 1150,
+        escapeT: FUGA.real,
         evadeCd: 40,
         fintaT: 0,
         fintaCd: 1e9,
@@ -1120,7 +1123,7 @@ function VolateriaEngine({
     /* LA BANDADA REAL (V71) — tres coronas que vuelan juntas desde la
        ronda 8: cada una aguanta lo suyo y el botín se reparte */
     const spawnJefeBanda = () => {
-      const hp = 3 + Math.floor(ronda / 8);
+      const hp = hpDeJefe(ronda);
       const dir0: 1 | -1 = rng() < 0.5 ? 1 : -1;
       const offs: [number, number][] = [[0, 0], [-66, 24], [66, -28]];
       for (let i = 0; i < 3; i++) {
@@ -1153,7 +1156,7 @@ function VolateriaEngine({
           fadeT: 0,
           targetY: bandaTop + 60 + rng() * Math.max(50, bandaBot - bandaTop - 90),
           retargetT: 60 + rng() * 60,
-          escapeT: 1300,
+          escapeT: FUGA.corona,
           evadeCd: 30 + rng() * 30,
           fintaT: 0,
           fintaCd: 1e9,
@@ -1208,7 +1211,7 @@ function VolateriaEngine({
         fadeT: 0,
         targetY: bandaTop + 20 + rng() * Math.max(40, bandaBot - bandaTop - 40),
         retargetT: 34 + rng() * 50,
-        escapeT: 460,
+        escapeT: FUGA.escolta,
         evadeCd: 30 + rng() * 40,
         fintaT: 0,
         fintaCd: 1e9,
@@ -1334,7 +1337,7 @@ function VolateriaEngine({
         } else {
           for (const q of patos) {
             if (q.tipo === "banda" && q.estado === "vuelo")
-              q.escapeT = Math.min(q.escapeT, 140);
+              q.escapeT = Math.min(q.escapeT, FUGA.nerviosa);
           }
         }
         freezeT = reduced ? 0 : 2;
@@ -1355,7 +1358,7 @@ function VolateriaEngine({
         p.ivy -= 1.4;
         /* V81: el plomo SOSTIENE la corona — mientras la trabajes no
            se escapa; cada impacto le devuelve tiempo (260f ≈ 4 s) */
-        p.escapeT = Math.max(p.escapeT, 260);
+        p.escapeT = Math.max(p.escapeT, FUGA.sostener);
         freezeT = reduced ? 0 : 4;
         sacude(6);
         vibra(12);
@@ -1869,74 +1872,54 @@ function VolateriaEngine({
       audio.disparo();
       /* 1) patos reales — la mira manda. Con ESCOPETA el anillo
          atraviesa: TODA la presa dentro cae (los cebos jamás roban) */
-      const presas: Pato[] = [];
-      const dists: number[] = [];
-      const esc = escopeta ? 1.85 : 1;
-      for (const p of patos) {
-        if (p.estado !== "vuelo" || ESPECIES[p.tipo].cebo) continue;
-        if (p.tipo === "humo" && alphaHumo(p) < 0.4) continue;
-        const dx = p.x - cx;
-        const dy = p.y - cy;
-        const d2 = dx * dx + dy * dy;
-        const R = 46 * (0.82 + p.scale * 0.3) * esc * (aj.asistencia ? 1.35 : 1);
-        if (d2 < R * R) {
-          presas.push(p);
-          dists.push(d2);
-        }
-      }
+      /* V83: la geometría del plomo vive en nucleo.ts — pura y
+         juzgable por tests. El motor solo dispara lo que decide. */
+      const presas = nucleo.presasDe(
+        patos,
+        cx,
+        cy,
+        escopeta,
+        aj.asistencia,
+        (p) =>
+          p.estado === "vuelo" &&
+          !ESPECIES[p.tipo].cebo &&
+          !(p.tipo === "humo" && alphaHumo(p) < 0.4),
+      );
       if (presas.length > 0) {
         /* el plomo entra por el más cercano */
-        const orden = presas
-          .map((p, i) => [p, dists[i]] as const)
-          .sort((a, b) => a[1] - b[1]);
-        const n = escopeta ? orden.length : 1;
-        for (let i = 0; i < n; i++) acierta(orden[i][0]);
+        const n = escopeta ? presas.length : 1;
+        for (let i = 0; i < n; i++) acierta(presas[i]);
         emit();
         return;
       }
       /* 2) globos — el premio flota */
-      const gi = globos.findIndex((g) => {
-        const dx = g.x - cx;
-        const dy = g.y - cy;
-        return dx * dx + dy * dy < 32 * 32;
-      });
+      const gi = globos.findIndex((g) => nucleo.impactaGlobo(cx, cy, g));
       if (gi >= 0) {
         explotaGlobo(gi);
         emit();
         return;
       }
       /* 3) el cebo — madera y plumas negras comen plomo */
-      let cebo: Pato | null = null;
-      let bc = Infinity;
-      for (const p of patos) {
-        if (p.estado !== "vuelo" || !ESPECIES[p.tipo].cebo) continue;
-        const dx = p.x - cx;
-        const dy = p.y - cy;
-        const d2 = dx * dx + dy * dy;
-        const R = 34 * (0.82 + p.scale * 0.3);
-        if (d2 < R * R && d2 < bc) {
-          bc = d2;
-          cebo = p;
-        }
-      }
+      const cebo = nucleo.ceboDe(
+        patos,
+        cx,
+        cy,
+        (p) => p.estado === "vuelo" && ESPECIES[p.tipo].cebo,
+      );
       if (cebo) pegaCebo(cebo);
       else {
         /* AL PELO (V68) — el plomo que silba cerca sin tocar premia
            la audacia: +25 y la racha NO se rompe (evangelio shmup:
            jugar peligroso se paga) */
-        let cerca: Pato | null = null;
-        let bd = Infinity;
-        for (const p of patos) {
-          if (p.estado !== "vuelo" || ESPECIES[p.tipo].cebo) continue;
-          if (p.tipo === "humo" && alphaHumo(p) < 0.4) continue;
-          const dx = p.x - cx;
-          const dy = p.y - cy;
-          const d = Math.hypot(dx, dy);
-          if (d < 66 && d < bd) {
-            bd = d;
-            cerca = p;
-          }
-        }
+        const cerca = nucleo.grazeDe(
+          patos,
+          cx,
+          cy,
+          (p) =>
+            p.estado === "vuelo" &&
+            !ESPECIES[p.tipo].cebo &&
+            !(p.tipo === "humo" && alphaHumo(p) < 0.4),
+        );
         if (cerca) {
           puntos += 25;
           grazesRun++;
@@ -2766,8 +2749,8 @@ function VolateriaEngine({
             /* TELEGRÁFO (V68) — la presa anuncia su huida: la feria
                avisa una vez y el plomo veloz todavía la alcanza */
             if (
-              preEsc > 45 &&
-              p.escapeT <= 45 &&
+              preEsc > FUGA.ultimoAviso &&
+              p.escapeT <= FUGA.ultimoAviso &&
               p.escapeT > 0 &&
               p.idx >= 0 &&
               p.idx < VOLADA
@@ -2778,8 +2761,8 @@ function VolateriaEngine({
                la huida se ve venir y el plomo veloz la alcanza */
             if (
               p.tipo === "real" &&
-              preEsc > 300 &&
-              p.escapeT <= 300 &&
+              preEsc > FUGA.aviso &&
+              p.escapeT <= FUGA.aviso &&
               p.escapeT > 0
             ) {
               audio.aviso();
@@ -2840,7 +2823,7 @@ function VolateriaEngine({
             p.flashT = 3;
             /* V79: la feria le da margen a su trampilla — el resurgido
                NO se escapa sin dejarse cobrar el segundo toque */
-            p.escapeT = Math.max(p.escapeT, 150);
+            p.escapeT = Math.max(p.escapeT, FUGA.resurge);
             for (let k = 0; k < 10; k++) {
               const a = Math.random() * 6.2832;
               plumas.push({
@@ -3363,7 +3346,7 @@ function VolateriaEngine({
         p.idx < VOLADA &&
         p.patron !== "poste" &&
         p.escapeT > 0 &&
-        p.escapeT < 130
+        p.escapeT < FUGA.telegrafo
       ) {
         const bl = 0.5 + 0.5 * Math.sin(p.t * 0.55);
         c.globalAlpha = 0.4 + 0.5 * bl;
@@ -3382,7 +3365,7 @@ function VolateriaEngine({
         p.estado === "vuelo" &&
         p.tipo === "real" &&
         p.escapeT > 0 &&
-        p.escapeT < 320
+        p.escapeT < FUGA.oro
       ) {
         const bl = 0.5 + 0.5 * Math.sin(p.t * 0.28);
         c.globalAlpha = 0.26 + 0.34 * bl;

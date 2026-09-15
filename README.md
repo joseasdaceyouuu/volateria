@@ -11,8 +11,18 @@ Nació como la demo D-05 del lab del portfolio
 [Vuelo Propio](https://github.com/joseasdaceyouuu/vuelopropio) y ahora vive
 como proyecto independiente.
 
-## La feria (v1.10.0)
+## La feria (v1.11.0)
 
+- **EL NÚCLEO DESNUDO (V83)** — la casa se puede juzgar sin navegador: la
+  geometría del plomo vive ahora en `nucleo.ts` (radios, orden de presa,
+  graze — sin React, sin canvas, sin audio) y los números de la casa
+  subieron a `config.ts` (LA MIRA, LOS RELOJES DE FUGA, hpDeJefe — la
+  misma lección del 380 del poder). **57 tests unitarios con `bun test`**
+  juzgan config/rng/nucleo/podio/fantasma/trofeos en milisegundos, y CI
+  corre el nuevo paso de tests tras el lint. Además el `CACHE_NAME` del
+  service worker lleva ahora la versión del paquete de serie (postbuild
+  lo sella en el standalone): adiós al shell viejo del bolsillo offline.
+  El motor sigue disparando exactamente igual: sonda e2e 49/49 verde.
 - **EL CAÑÓN SECO (V82)** — la raíz de verdad del "ave inmatable": la
   Bandada pide 12 impactos con 15 balas y, en escritorio, quedarse a
   cero dejaba el clic SECO para siempre (la recarga automática era

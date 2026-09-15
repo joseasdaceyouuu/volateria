@@ -1,6 +1,6 @@
 {
   "name": "volateria",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "private": true,
   "description": "El tiro al pato de feria, reimaginado — oleadas evasivas, señuelos, trampas de la casa, globos de poder y EL PATO REAL. Canvas 2D + WebGL + WebAudio, cero assets.",
   "scripts": {
@@ -8,7 +8,11 @@
     "build": "next build && node scripts/postbuild.mjs",
     "start": "node .next/standalone/server.js",
     "lint": "eslint .",
-    "probe": "node scripts/probe.mjs"
+    "test": "bun test",
+    "probe": "node scripts/probe.mjs",
+    "arnes:bandada": "node scripts/arnes/bandada.mjs",
+    "arnes:fin9": "node scripts/arnes/fin-ronda9.mjs",
+    "arnes:finvisual": "node scripts/arnes/fin-visual.mjs"
   },
   "dependencies": {
     "next": "^16.1.1",

@@ -2,9 +2,11 @@
 
 > El tiro al pato de feria, reimaginado: atardecer de lona, zorro cómplice y un cargador que nunca sobra.
 
-## En escena (v1.10.0)
+## En escena (v1.11.0)
 
 Lo que ya luces bajo las bombillas de la feria:
+
+- **EL NÚCLEO DESNUDO (V83)** — el corazón puro del plomo extraído del monolito: `nucleo.ts` (geometría del disparo: radios, orden de presa, graze, cebo — sin React ni canvas ni audio), LA MIRA y LOS RELOJES DE FUGA y hpDeJefe en config como única fuente de verdad, **57 tests unitarios con `bun test`** (config/rng/nucleo/podio/fantasma/trofeos) con paso nuevo en CI, y `CACHE_NAME` sellado con la versión del paquete en el postbuild — el shell offline ya no queda viejo. Sonda e2e 49/49: el motor no cambió un frame.
 
 - **EL CAÑÓN SECO (V82)** — adiós al ave "inmatable" de verdad: un clic sin balas arma la recarga sola (escritorio iguala a táctil) y lo grita junto a la mira ("¡sin plomo! recargando"); el jefe se lee con chip de coronas/vidas y la sonda 8k derriba la bandada sin tocar R jamás. El replay del fantasma queda intacto (el cañón seco no actúa reviviendo).
 - **LA FUGA AVISADA (V81)** — la fuga se ve venir y el fin se explica: las coronas de la Bandada Real arden en oro a 5 s de irse ("¡la corona se escapa!"), cada impacto les devuelve reloj, el telegráfo de fuga de toda la volada destella 2 s, la banda silvestre sin dueño se esparce al cielo en vez de orbitar eterna, el cartel del fin CANTA el motivo ("cuota corta: 3 de 5"), zafiro/espejo/mensajero vuelan con jalones impredecibles desde la ronda 3, y jefes vuelve a contar UNA corona por bandada (regresión V75 cerrada).

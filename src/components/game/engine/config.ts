@@ -79,6 +79,11 @@ export const cuotaModo = (r: number, m: Modo) =>
 export const tipoDeJefe = (r: number): "real" | "banda" =>
   r % 8 === 0 ? "banda" : "real";
 
+/* la vida de la corona: 3 de base y +1 cada 8 rondas — el plomo
+   pide más puntería conforme sube la escalera. V83: aquí, no
+   escondida en el motor (la misma lección del 380 del poder) */
+export const hpDeJefe = (r: number) => 3 + Math.floor(r / 8);
+
 /* V71: las letras del PREMIO — el mensajero verde las trae una a una */
 export const LETRAS_PREMIO = "PREMIO";
 
@@ -110,6 +115,37 @@ export const TRAMPA = {
   lastradoProb: (r: number) => 0.11 + 0.015 * Math.min(r, 8),
   planchaMul: 1.28, // LA PLANCHA APRIETA al cierre de la cuota
   galletaPuntos: 150, // galleta extra cuando ya llevas una puesta
+} as const;
+
+/* ── V83: LA MIRA — los radios del plomo viven aquí y en ningún
+   otro sitio. El motor mira; el nucleo calcula; los tests velan. ── */
+export const MIRA = {
+  base: 46, // radio base de acierto sobre la presa
+  escala0: 0.82, // parte fija del tamaño
+  escala1: 0.3, // parte proporcional al scale de cada ave
+  escopeta: 1.85, // el anillo atraviesa: radio ×1.85
+  asistencia: 1.35, // con asistencia el mundo pesca más fácil
+  cebo: 34, // la madera come plomo, pero más cerca
+  globo: 32, // el premio flota con radio propio
+  alPelo: 66, // el graze: el plomo que silba cerca paga +25
+} as const;
+
+/* ── V83: LOS RELOJES DE FUGA — cuánto aguanta cada presa antes de
+   cansarse del cazador y partir al cielo (frames, 60f ≙ dt 1) ── */
+export const FUGA = {
+  banda: 900, // banda silvestre: 900 + azar·bandaAzar
+  bandaAzar: 240,
+  real: 1150, // EL PATO REAL
+  corona: 1300, // cada corona de LA BANDADA REAL
+  escolta: 460, // la escolta del real
+  eterno: 1e9, // señuelo y cuervo no se cansan jamás
+  sostener: 260, // cada plomo en la corona le devuelve reloj
+  nerviosa: 140, // mini tocado: la formación se espanta antes
+  aviso: 300, // la corona lo grita a ~5 s de irse
+  ultimoAviso: 45, // el telegráfo de siempre: 0.75 s antes
+  telegrafo: 130, // anillo de fuga visible en el render
+  oro: 320, // anillo de oro visible en el render
+  resurge: 150, // el lastrado que resurge gana margen de trampilla
 } as const;
 
 /* llaves del localStorage de la meta (V72) */

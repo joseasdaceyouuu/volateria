@@ -36,6 +36,10 @@ jobs:
       - name: Lint
         run: bun run lint
 
+      # 5b · Tests unitarios del núcleo puro (V83): config/rng/nucleo/meta
+      - name: Tests unitarios
+        run: bun test
+
       # 6 · next build + postbuild.mjs (copia static/ al standalone)
       - name: Build (standalone)
         run: bun run build
